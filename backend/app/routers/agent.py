@@ -5,6 +5,7 @@
 """
 import os
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
@@ -13,15 +14,16 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.models.subject import Concept, SubjectPackage
+from app.models.subject import Concept, SubjectPackage, UserSubjectAccess
 from app.models.content import Chapter, UploadedDocument
 from app.models.preferences import UserPreferences
+from app.models.study import StudyLog
 from app.services import ai_service, companion_service, embedding_service, vector_service
-from app.workers.tasks import process_uploaded_document_task
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 UPLOAD_DIR = "/app/uploads"
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "English", "ar": "Arabisch"}
 
@@ -86,6 +88,55 @@ def _subject_context(db: Session, subject_package_id: int) -> SubjectPackage | N
     return db.query(SubjectPackage).filter(SubjectPackage.id == subject_package_id).first()
 
 
+def _require_subject_access(db: Session, user: User, subject_package_id: int) -> SubjectPackage:
+    subject = _subject_context(db, subject_package_id)
+    if not subject:
+        raise HTTPException(404, "Subject not found")
+    if user.role != "admin":
+        grant = (
+            db.query(UserSubjectAccess)
+            .filter(
+                UserSubjectAccess.user_id == user.id,
+                UserSubjectAccess.subject_package_id == subject_package_id,
+            )
+            .first()
+        )
+        if not grant:
+            raise HTTPException(403, "You do not have access to this subject")
+    return subject
+
+
+def _require_concept_access(db: Session, user: User, concept_id: int) -> Concept:
+    concept = db.query(Concept).filter(Concept.id == concept_id).first()
+    if not concept:
+        raise HTTPException(404, "Concept not found")
+    _require_subject_access(db, user, concept.subject_package_id)
+    return concept
+
+
+@router.get("/subjects")
+def list_subjects(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    query = db.query(SubjectPackage)
+    if user.role != "admin":
+        query = query.join(
+            UserSubjectAccess,
+            UserSubjectAccess.subject_package_id == SubjectPackage.id,
+        ).filter(UserSubjectAccess.user_id == user.id)
+    subjects = query.order_by(SubjectPackage.name).all()
+    return {
+        "subjects": [
+            {
+                "id": subject.id,
+                "name": subject.name,
+                "university": subject.university,
+                "language": subject.language,
+                "review_status": subject.review_status,
+            }
+            for subject in subjects
+        ]
+    }
+
+
 # ── محادثة المساعد ────────────────────────────────────────────
 class ChatIn(BaseModel):
     message: str
@@ -100,11 +151,15 @@ async def chat(data: ChatIn, user: User = Depends(get_current_user),
 
     subject_name, university, teaching_language = "General Studies", None, "de"
     if data.subject_package_id:
-        subject = _subject_context(db, data.subject_package_id)
-        if subject:
-            subject_name = subject.name
-            university = subject.university
-            teaching_language = subject.language
+        subject = _require_subject_access(db, user, data.subject_package_id)
+        subject_name = subject.name
+        university = subject.university
+        teaching_language = subject.language
+
+    if data.chapter_id:
+        chapter = db.query(Chapter).filter(Chapter.id == data.chapter_id).first()
+        if not chapter or chapter.subject_package_id != data.subject_package_id:
+            raise HTTPException(400, "Chapter does not belong to the selected subject")
 
     retrieved_context = None
     if data.subject_package_id:
@@ -137,8 +192,8 @@ async def chat(data: ChatIn, user: User = Depends(get_current_user),
 
 # ── تفضيلات المستخدم — لغة الواجهة والمظهر (منفصلة عن لغة التدريس) ──
 class PreferencesIn(BaseModel):
-    ui_language: str | None = None  # de | en | ar
-    theme: str | None = None        # light | dark | system
+    ui_language: Literal["de", "en", "ar"] | None = None
+    theme: Literal["light", "dark", "system"] | None = None
     avatar_corner_enabled: bool | None = None
 
 
@@ -200,6 +255,9 @@ class AttemptIn(BaseModel):
 @router.post("/attempt")
 def attempt(data: AttemptIn, user: User = Depends(get_current_user),
             db: Session = Depends(get_db)):
+    _require_concept_access(db, user, data.concept_id)
+    if data.attempt_number not in (1, 2, 3):
+        raise HTTPException(400, "attempt_number must be 1, 2, or 3")
     name = user.full_name or "there"
     result = companion_service.record_attempt(
         db, user.id, data.concept_id, data.is_correct, data.attempt_number, data.session_note
@@ -222,6 +280,7 @@ def attempt(data: AttemptIn, user: User = Depends(get_current_user),
 @router.get("/fun-fact")
 def fun_fact(concept_id: int, minute: int, user: User = Depends(get_current_user),
              db: Session = Depends(get_db)):
+    _require_concept_access(db, user, concept_id)
     name = user.full_name or "there"
     fact = companion_service.pick_fun_fact(db, user.id, concept_id)
     if not fact:
@@ -234,6 +293,7 @@ def fun_fact(concept_id: int, minute: int, user: User = Depends(get_current_user
 @router.get("/review-queue")
 def review_queue(subject_package_id: int, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)):
+    _require_subject_access(db, user, subject_package_id)
     due = companion_service.concepts_due_for_review(db, user.id, subject_package_id)
     return {"due_concepts": [{"id": c.id, "name": c.name} for c in due]}
 
@@ -242,6 +302,7 @@ def review_queue(subject_package_id: int, user: User = Depends(get_current_user)
 @router.get("/chapters")
 def list_chapters(subject_package_id: int, db: Session = Depends(get_db),
                    user: User = Depends(get_current_user)):
+    _require_subject_access(db, user, subject_package_id)
     chapters = (
         db.query(Chapter)
         .filter(Chapter.subject_package_id == subject_package_id)
@@ -249,6 +310,43 @@ def list_chapters(subject_package_id: int, db: Session = Depends(get_db),
         .all()
     )
     return {"chapters": [{"id": c.id, "number": c.chapter_number, "title": c.title} for c in chapters]}
+
+
+@router.get("/concepts")
+def list_concepts(
+    subject_package_id: int,
+    chapter_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_subject_access(db, user, subject_package_id)
+    if chapter_id is not None:
+        chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+        if not chapter or chapter.subject_package_id != subject_package_id:
+            raise HTTPException(404, "Chapter not found in this subject")
+
+    # Concepts predate chapter associations in the current schema. Return the
+    # authorized subject's concepts and expose this limitation explicitly.
+    concepts = (
+        db.query(Concept)
+        .filter(Concept.subject_package_id == subject_package_id)
+        .order_by(Concept.name)
+        .all()
+    )
+    return {
+        "chapter_filter_applied": False,
+        "concepts": [
+            {
+                "id": concept.id,
+                "name": concept.name,
+                "everyday_analogy": concept.everyday_analogy,
+                "mechanism": concept.mechanism_json,
+                "difficulty": concept.difficulty,
+                "official_source_note": concept.official_source_note,
+            }
+            for concept in concepts
+        ],
+    }
 
 
 # ── رفع ومتابعة الملفات ─────────────────────────────────────────
@@ -260,21 +358,31 @@ async def upload_material(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _require_subject_access(db, user, subject_package_id)
+    if chapter_id is not None:
+        chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+        if not chapter or chapter.subject_package_id != subject_package_id:
+            raise HTTPException(400, "Chapter does not belong to the selected subject")
     if not file.filename.lower().endswith((".pdf", ".pptx", ".ppt")):
         raise HTTPException(400, "Only PDF or PowerPoint files are allowed")
 
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File exceeds the 50 MB limit")
+
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    unique_name = f"{uuid.uuid4().hex}_{file.filename}"
+    safe_filename = os.path.basename(file.filename)
+    unique_name = f"{uuid.uuid4().hex}_{safe_filename}"
     storage_path = os.path.join(UPLOAD_DIR, unique_name)
 
     with open(storage_path, "wb") as f:
-        f.write(await file.read())
+        f.write(contents)
 
     doc = UploadedDocument(
         uploaded_by_user_id=user.id,
         subject_package_id=subject_package_id,
         chapter_id=chapter_id,
-        filename=file.filename,
+        filename=safe_filename,
         storage_path=storage_path,
         status="processing",
     )
@@ -282,6 +390,7 @@ async def upload_material(
     db.commit()
     db.refresh(doc)
 
+    from app.workers.tasks import process_uploaded_document_task
     process_uploaded_document_task.delay(doc.id)
 
     return {"document_id": doc.id, "status": "processing"}
@@ -290,9 +399,13 @@ async def upload_material(
 @router.get("/materials")
 def list_materials(subject_package_id: int, db: Session = Depends(get_db),
                     user: User = Depends(get_current_user)):
+    _require_subject_access(db, user, subject_package_id)
     docs = (
         db.query(UploadedDocument)
-        .filter(UploadedDocument.subject_package_id == subject_package_id)
+        .filter(
+            UploadedDocument.subject_package_id == subject_package_id,
+            UploadedDocument.uploaded_by_user_id == user.id,
+        )
         .order_by(UploadedDocument.created_at.desc())
         .all()
     )
@@ -308,5 +421,28 @@ def list_materials(subject_package_id: int, db: Session = Depends(get_db),
 
 
 @router.get("/history")
-def history(user: User = Depends(get_current_user)):
-    return {"items": []}
+def history(
+    subject_package_id: int | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(StudyLog, Concept).join(Concept, Concept.id == StudyLog.concept_id).filter(
+        StudyLog.user_id == user.id
+    )
+    if subject_package_id is not None:
+        _require_subject_access(db, user, subject_package_id)
+        query = query.filter(Concept.subject_package_id == subject_package_id)
+    rows = query.order_by(StudyLog.created_at.desc()).limit(100).all()
+    return {
+        "items": [
+            {
+                "id": log.id,
+                "concept_id": concept.id,
+                "concept_name": concept.name,
+                "is_correct": log.is_correct,
+                "attempt_number": log.attempt_number,
+                "created_at": log.created_at,
+            }
+            for log, concept in rows
+        ]
+    }

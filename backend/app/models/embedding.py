@@ -3,11 +3,16 @@ Embeddings table (pgvector) — extended with scoping columns so RAG search can
 be restricted to a specific chapter/subject, not just a global search.
 """
 from datetime import datetime
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import String, Text, Integer, DateTime, JSON, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.config import settings
 from app.database import Base
+
+if settings.DATABASE_URL.startswith("sqlite"):
+    EmbeddingVector = JSON
+else:
+    from pgvector.sqlalchemy import Vector
+    EmbeddingVector = Vector(settings.EMBEDDING_DIM)
 
 
 class Embedding(Base):
@@ -22,7 +27,7 @@ class Embedding(Base):
     document_id: Mapped[int | None] = mapped_column(ForeignKey("uploaded_documents.id"), index=True)
 
     content: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(settings.EMBEDDING_DIM))
+    embedding: Mapped[list[float]] = mapped_column(EmbeddingVector)
     meta: Mapped[dict] = mapped_column(JSON, default=dict)
     source_ref: Mapped[str | None] = mapped_column(String(255), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

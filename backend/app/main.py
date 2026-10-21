@@ -51,9 +51,17 @@ from app.core.ratelimit import RateLimitMiddleware, SecurityHeadersMiddleware  #
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
+allowed_origins = [settings.FRONTEND_URL]
+if settings.EXTRA_CORS_ORIGINS:
+    allowed_origins.extend(
+        origin.strip()
+        for origin in settings.EXTRA_CORS_ORIGINS.split(",")
+        if origin.strip()
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

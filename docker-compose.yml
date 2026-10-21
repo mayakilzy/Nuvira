@@ -43,7 +43,7 @@ services:
     networks: [saas_net]
 
   backend:
-    image: ${DOCKER_NS:-localdev}/saas-base-backend:${TAG:-1.0.0}
+    image: ${DOCKER_NS:-localdev}/fahem-backend:${TAG:-1.0.0}
     build: ./backend
     restart: unless-stopped
     env_file: .env
@@ -55,7 +55,7 @@ services:
     networks: [saas_net]
 
   worker:
-    image: ${DOCKER_NS:-localdev}/saas-base-backend:${TAG:-1.0.0}
+    image: ${DOCKER_NS:-localdev}/fahem-backend:${TAG:-1.0.0}
     build: ./backend
     restart: unless-stopped
     env_file: .env
@@ -69,7 +69,7 @@ services:
     profiles: ["full"]   # disable on tiny servers: omit --profile full
 
   frontend:
-    image: ${DOCKER_NS:-localdev}/saas-base-frontend:${TAG:-1.0.0}
+    image: ${DOCKER_NS:-localdev}/fahem-frontend:${TAG:-1.0.0}
     build:
       context: ./frontend
       args:

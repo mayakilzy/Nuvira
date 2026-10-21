@@ -2,8 +2,6 @@
 Document processing — استخراج نص من PDF/PPTX، تقطيع لقطع صغيرة، تحويل كل قطعة
 لـ embedding مرتبط بالفصل والمادة، مع تحديث حالة الملف بقاعدة البيانات.
 """
-from pptx import Presentation
-from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
 from app.models.content import UploadedDocument
@@ -12,9 +10,11 @@ from app.services import embedding_service, vector_service
 
 def extract_text(path: str) -> str:
     if path.lower().endswith(".pdf"):
+        from pypdf import PdfReader
         reader = PdfReader(path)
         return "\n".join(page.extract_text() or "" for page in reader.pages)
     elif path.lower().endswith((".pptx", ".ppt")):
+        from pptx import Presentation
         prs = Presentation(path)
         chunks = []
         for slide in prs.slides:
