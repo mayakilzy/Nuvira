@@ -17,6 +17,7 @@ Real authenticated API bindings are implemented for enrolled subjects, chapters,
 
 - `backend/app/routers/agent.py`: authorized educational endpoints and real history/concept/subject contracts.
 - `backend/tests/test_agent_access.py`: two-student access regression coverage.
+- `backend/tests/test_companion_session.py`: concurrent avatar-session regression coverage.
 - `frontend/src/components/fahem/`: educational UI, avatar, icons and responsive styles.
 - `frontend/src/lib/fahem-api.ts`: typed authenticated bindings.
 - `/dashboard` and `/workspace`: FAHEM home and safe redirect.

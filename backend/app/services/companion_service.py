@@ -7,6 +7,7 @@ import random
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.study import StudyLog, FunFactShownLog, AvatarState, PhraseUsage
@@ -96,8 +97,17 @@ def get_or_rotate_avatar(db: Session, user_id: int, session_key: str) -> dict:
     if not state:
         state = AvatarState(user_id=user_id, last_session_key=session_key)
         db.add(state)
-        db.commit()
-        db.refresh(state)
+        try:
+            db.commit()
+            db.refresh(state)
+        except IntegrityError:
+            # Two initial requests can race (for example React Strict Mode in
+            # development). The unique user_id constraint chooses the winner;
+            # reload that committed row instead of returning a 500.
+            db.rollback()
+            state = db.query(AvatarState).filter(AvatarState.user_id == user_id).first()
+            if not state:
+                raise
         return {"shape": state.current_shape, "color": state.current_color}
 
     if state.last_session_key != session_key:
