@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.db
+node_modules/
+.next/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
+# local backup of the original deployment (contains a real .env — never commit)
+/suzanna.zip
+.env

@@ -1,0 +1,105 @@
+# =============================================================================
+#  SaaS Template — self-contained stack.
+#
+#  ISOLATION RULES (so it never collides with anything already on the server):
+#    - Postgres & Redis are PRIVATE: no host ports published (no 5432 / 6379).
+#    - Reverse proxy (nginx) is OPTIONAL via the "edge" profile. On a server
+#      that already runs nginx-proxy-manager, DO NOT enable it — point a
+#      subdomain at backend:8995 / frontend:3008 instead.
+#    - Everything lives on its own bridge network `saas_net`.
+#
+#  IMAGES: set DOCKER_NS (your Docker Hub user) and TAG in .env.
+#    Build & push :  ./scripts/build-and-push.sh 1.0.0
+#    Fresh deploy :  docker compose pull && docker compose up -d
+# =============================================================================
+
+name: suzanna
+
+x-image-ns: &ns ${DOCKER_NS:-localdev}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-saas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saas}
+      POSTGRES_DB: ${POSTGRES_DB:-saas}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [saas_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-saas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks: [saas_net]
+
+  backend:
+    image: ${DOCKER_NS:-localdev}/saas-base-backend:${TAG:-1.0.0}
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    networks: [saas_net]
+
+  worker:
+    image: ${DOCKER_NS:-localdev}/saas-base-backend:${TAG:-1.0.0}
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      - redis
+      - db
+    networks: [saas_net]
+    profiles: ["full"]   # disable on tiny servers: omit --profile full
+
+  frontend:
+    image: ${DOCKER_NS:-localdev}/saas-base-frontend:${TAG:-1.0.0}
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8995}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8995}
+    depends_on:
+      - backend
+    networks: [saas_net]
+
+  # Optional bundled reverse proxy — ONLY for buyers without their own proxy.
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks: [saas_net]
+    profiles: ["edge"]   # NOT started by default
+
+volumes:
+  pg_data:
+  redis_data:
+  uploads:
+
+networks:
+  saas_net:
+    driver: bridge
