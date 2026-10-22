@@ -1,11 +1,13 @@
 "use client";
-import React from "react";
+import React, { useId } from "react";
 
 export function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  const generatedId = useId();
+  const inputId = props.id || generatedId;
   return (
     <div className="field">
-      <label className="label">{label}</label>
-      <input className="input" {...props} />
+      <label className="label" htmlFor={inputId}>{label}</label>
+      <input className="input" {...props} id={inputId} />
     </div>
   );
 }

@@ -47,7 +47,7 @@ test("register, restore, settings, logout and URL-token boundaries", async ({ pa
 
 test("invalid login is rejected without credentials in the URL", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(`missing-${Date.now()}@example.invalid`);
+  await page.getByLabel("Email").fill(`missing-${Date.now()}@example.com`);
   await page.getByLabel("Password").fill("SyntheticPass1234");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -56,7 +56,7 @@ test("invalid login is rejected without credentials in the URL", async ({ page }
 
 test("known limitation: zero-subject dashboard settings tab is blocked", async ({ page }) => {
   test.fail(true, "Existing onboarding defect: the dashboard empty state masks settings content");
-  const email = `zero-subject-${Date.now()}@example.invalid`;
+  const email = `zero-subject-${Date.now()}@example.com`;
   await page.goto("/register");
   await page.getByLabel("Full name").fill("Zero Subject Student");
   await page.getByLabel("Email").fill(email);
