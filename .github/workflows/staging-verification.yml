@@ -91,6 +91,17 @@ jobs:
           set -euo pipefail
           curl -fsS http://127.0.0.1:8800/health | tee .staging-artifacts/backend-health.json
           curl -fsS http://127.0.0.1:8800/health/db | tee .staging-artifacts/backend-db-health.json
+          {
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db postgres --version
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+              psql -U nuvira_staging -d nuvira_staging -Atc "SELECT 'server=' || version(); SELECT 'pgvector=' || extversion FROM pg_extension WHERE extname='vector';"
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-server --version
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend \
+              python -c "import celery, pgvector, platform; print('python=' + platform.python_version()); print('celery=' + celery.__version__); print('pgvector-python=' + pgvector.__version__)"
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T frontend node --version
+            docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T frontend \
+              node -p "'next=' + require('./node_modules/next/package.json').version"
+          } | tee .staging-artifacts/runtime-versions.txt
           frontend_status="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3300/)"
           test "$frontend_status" -ge 200
           test "$frontend_status" -lt 400
