@@ -3,6 +3,8 @@ name: Nuvira STAGING-01 verification
 on:
   push:
     branches: [test/nuvira-staging-01]
+    paths-ignore:
+      - "NUVIRA_STAGING_01_*.md"
   workflow_dispatch:
 
 permissions:
@@ -89,14 +91,25 @@ jobs:
           set -euo pipefail
           curl -fsS http://127.0.0.1:8800/health | tee .staging-artifacts/backend-health.json
           curl -fsS http://127.0.0.1:8800/health/db | tee .staging-artifacts/backend-db-health.json
-          curl -fsS http://127.0.0.1:3300/ >/dev/null
-          test -z "$(docker compose --env-file .env.staging -f docker-compose.staging.yml port db 5432 2>/dev/null || true)"
-          test -z "$(docker compose --env-file .env.staging -f docker-compose.staging.yml port redis 6379 2>/dev/null || true)"
+          frontend_status="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3300/)"
+          test "$frontend_status" -ge 200
+          test "$frontend_status" -lt 400
+          for service_port in "db:5432" "redis:6379"; do
+            service="${service_port%%:*}"
+            port="${service_port##*:}"
+            container="$(docker compose --env-file .env.staging -f docker-compose.staging.yml ps -q "$service")"
+            bindings="$(docker inspect -f '{{json .NetworkSettings.Ports}}' "$container" | jq -r --arg key "${port}/tcp" '.[$key] // empty')"
+            test -z "$bindings"
+          done
+          : > .staging-artifacts/runtime-networks.txt
           for service in db redis backend worker frontend; do
             container="$(docker compose --env-file .env.staging -f docker-compose.staging.yml ps -q "$service")"
             test "$(docker inspect -f '{{ index .Config.Labels "com.nuvira.environment" }}' "$container")" = staging
-            docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$container"
-          done | sort -u | tee .staging-artifacts/runtime-networks.txt
+            test "$(docker inspect -f '{{ index .Config.Labels "com.nuvira.mission" }}' "$container")" = staging-01
+            docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$container" >> .staging-artifacts/runtime-networks.txt
+          done
+          sort -u -o .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-networks.txt
+          cat .staging-artifacts/runtime-networks.txt
           docker volume ls --filter label=com.docker.compose.project=nuvira-foundation-staging --format '{{.Name}}' | sort | tee .staging-artifacts/runtime-volumes.txt
           ! grep -Eiq '(^|[_-])nuvira_(postgres_data|redis_data|uploads)($|[_-])|hermes-network' .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-volumes.txt
 
@@ -203,6 +216,7 @@ jobs:
             frontend/playwright-report/
             frontend/test-results/
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 14
 
       - name: Stop only the isolated staging project
