@@ -97,7 +97,7 @@ jobs:
               psql -U nuvira_staging -d nuvira_staging -Atc "SELECT 'server=' || version(); SELECT 'pgvector=' || extversion FROM pg_extension WHERE extname='vector';"
             docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-server --version
             docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend \
-              python -c "import celery, pgvector, platform; print('python=' + platform.python_version()); print('celery=' + celery.__version__); print('pgvector-python=' + pgvector.__version__)"
+              python -c "import celery, importlib.metadata, platform; print('python=' + platform.python_version()); print('celery=' + celery.__version__); print('pgvector-python=' + importlib.metadata.version('pgvector'))"
             docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T frontend node --version
             docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T frontend \
               node -p "'next=' + require('./node_modules/next/package.json').version"
