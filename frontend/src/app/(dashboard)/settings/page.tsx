@@ -29,7 +29,7 @@ export default function Settings() {
         <h3 style={{ fontSize: 16, marginBottom: 14 }}>Profile</h3>
         <form onSubmit={saveProfile}>
           <Field label="Full name" value={name} onChange={(e) => setName(e.target.value)} />
-          <div className="field"><label className="label">Email</label><input className="input" value={user?.email || ""} disabled /></div>
+          <Field label="Email" type="email" value={user?.email || ""} disabled />
           <div style={{ height: 12 }} />
           <Alert kind="error">{err}</Alert><Alert kind="ok">{msg}</Alert>
           <button className="btn btn-primary" style={{ marginTop: 12 }}>Save changes</button>
