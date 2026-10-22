@@ -1,7 +1,7 @@
 """Lowercase all stored emails so lookups are case-insensitive
 
 Revision ID: 0001_lowercase_emails
-Revises: (none — first migration in this repo)
+Revises: 0000_authoritative_schema
 Create Date: 2026-10-13
 
 SAFETY: refuses to run if two different accounts would collide after
@@ -25,7 +25,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0001_lowercase_emails"
-down_revision = None
+down_revision = "0000_authoritative_schema"
 branch_labels = None
 depends_on = None
 

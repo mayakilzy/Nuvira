@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # --- App ---
     APP_NAME: str = "Nuvira"
-    ENV: str = "development"          # development | production
+    ENV: str = "development"          # development | staging | production
     DEBUG: bool = True
     API_PREFIX: str = ""              # e.g. "/api" if you want everything namespaced
     FRONTEND_URL: str = "https://nuvira.agentcraft.info"
@@ -93,11 +93,13 @@ class Settings(BaseSettings):
     def validate_security_posture(self):
         if self.JWT_ALGORITHM != "HS256":
             raise ValueError("JWT_ALGORITHM must be HS256")
-        if self.ENV == "production":
+        if self.ENV in {"staging", "production"}:
             errors: list[str] = []
+            if self.EMBEDDING_DIM != 1536:
+                errors.append("EMBEDDING_DIM must match the migrated vector dimension of 1536")
             if self.DEBUG:
                 errors.append("DEBUG must be false")
-            if self.JWT_SECRET == "CHANGE_ME_IN_PRODUCTION" or len(self.JWT_SECRET) < 64:
+            if "change_me" in self.JWT_SECRET.lower() or len(self.JWT_SECRET) < 64:
                 errors.append("JWT_SECRET must be a non-placeholder value of at least 64 characters")
             if self.FIRST_ADMIN_ENABLED and (
                 not self.FIRST_ADMIN_EMAIL
@@ -127,7 +129,7 @@ class Settings(BaseSettings):
             if self.EMAIL_ENABLED and not self.RESEND_API_KEY:
                 errors.append("Email is enabled but RESEND_API_KEY is missing")
             if errors:
-                raise ValueError("Unsafe production configuration: " + "; ".join(errors))
+                raise ValueError("Unsafe managed-environment configuration: " + "; ".join(errors))
         return self
 
 

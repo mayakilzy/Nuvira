@@ -12,24 +12,22 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine, Base
+from app.services.schema_service import require_expected_revision
 import app.models  # noqa: F401  (register all models on Base.metadata)
 from app.routers import auth, billing, credits, user, admin, agent
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Enable pgvector (PostgreSQL only) BEFORE creating tables that use Vector.
-    try:
+    managed_environment = settings.ENV in {"staging", "production"}
+    # Managed environments must already be migrated. Development retains the
+    # historical convenience path for fast local SQLite work only.
+    if managed_environment:
+        require_expected_revision(engine)
+    else:
         if engine.dialect.name == "postgresql":
-            with engine.connect() as conn:
-                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-                conn.commit()
-    except Exception as e:
-        if settings.ENV == "production":
-            raise
-        print(f"[startup] vector extension: {e}")
-    # Development convenience only. Production schema must come from Alembic.
-    if settings.ENV != "production":
+            with engine.begin() as connection:
+                connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         Base.metadata.create_all(bind=engine)
     # Seed default plans + first admin (idempotent).
     try:
@@ -41,7 +39,7 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
     except Exception as e:
-        if settings.ENV == "production":
+        if managed_environment:
             raise
         print(f"[seed] skipped: {e}")
     yield
