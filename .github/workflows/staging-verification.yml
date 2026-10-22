@@ -141,7 +141,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend python -m pytest -q | tee .staging-artifacts/backend-tests.txt
+          # The repository-level isolation test loads /scripts from the checkout;
+          # the production-shaped backend image intentionally contains /backend only.
+          # Its real preflight already ran above, so keep the in-image suite scoped
+          # to backend code and integrations.
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend \
+            python -m pytest -q --ignore=tests/test_staging_isolation.py | tee .staging-artifacts/backend-tests.txt
           docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
             -e FOUNDATION_CELERY_BROKER_URL=redis://redis:6379/1 \
             -e FOUNDATION_CELERY_RESULT_BACKEND=redis://redis:6379/2 \
