@@ -40,7 +40,7 @@ def test_refresh_reuse_revokes_family_and_invalid_origin_is_rejected():
     _assert_isolated_runtime()
     unique = str(time.time_ns())
     with httpx.Client(base_url=API_URL, timeout=20) as client:
-        _, original_refresh = _register(client, f"rotation-{unique}@example.invalid")
+        _, original_refresh = _register(client, f"rotation-{unique}@example.com")
         rotated = client.post("/auth/refresh", headers={"Origin": FRONTEND_URL})
         assert rotated.status_code == 200, rotated.text
         replacement_refresh = client.cookies.get(settings.REFRESH_COOKIE_NAME)
@@ -52,24 +52,24 @@ def test_refresh_reuse_revokes_family_and_invalid_origin_is_rejected():
         assert client.post("/auth/refresh", headers={"Origin": FRONTEND_URL}).status_code == 401
 
     with httpx.Client(base_url=API_URL, timeout=20) as origin_client:
-        _register(origin_client, f"origin-{unique}@example.invalid")
+        _register(origin_client, f"origin-{unique}@example.com")
         assert origin_client.post("/auth/refresh", headers={"Origin": "https://evil.example"}).status_code == 403
 
 
 def test_logout_password_reset_and_expired_access_token_revoke_access():
     _assert_isolated_runtime()
     unique = str(time.time_ns())
-    email = f"revocation-{unique}@example.invalid"
+    email = f"revocation-{unique}@example.com"
     with httpx.Client(base_url=API_URL, timeout=20) as client:
         access, _ = _register(client, email)
         assert client.get("/auth/me", headers={"Authorization": f"Bearer {access}"}).status_code == 200
         assert client.post("/auth/logout", headers={"Origin": FRONTEND_URL}).status_code == 200
         assert client.post("/auth/refresh", headers={"Origin": FRONTEND_URL}).status_code == 401
 
-        _, _ = _register(client, f"reset-{unique}@example.invalid")
+        _, _ = _register(client, f"reset-{unique}@example.com")
         db = SessionLocal()
         try:
-            reset_user = db.query(User).filter(User.email == f"reset-{unique}@example.invalid").one()
+            reset_user = db.query(User).filter(User.email == f"reset-{unique}@example.com").one()
             reset_token = create_reset_token(str(reset_user.id))
         finally:
             db.close()

@@ -92,8 +92,8 @@ def _wait_for_document(client: httpx.Client, token: str, subject_id: int, docume
 def test_synthetic_pdf_pptx_worker_processing_and_student_isolation():
     _assert_isolated_runtime()
     unique = str(time.time_ns())
-    email_a = f"staging-a-{unique}@example.invalid"
-    email_b = f"staging-b-{unique}@example.invalid"
+    email_a = f"staging-a-{unique}@example.com"
+    email_b = f"staging-b-{unique}@example.com"
     with httpx.Client(base_url=API_URL, timeout=20) as client_a, httpx.Client(base_url=API_URL, timeout=20) as client_b:
         token_a = _register(client_a, email_a)
         token_b = _register(client_b, email_b)
