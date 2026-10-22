@@ -82,4 +82,3 @@ The npm lock is deterministic and audit-clean. Backend direct versions are pinne
 Git reports LF-to-CRLF notices in the working copy; `git diff --check` reports no whitespace errors.
 
 - Next action: standardize line endings separately with `.gitattributes` if desired.
-

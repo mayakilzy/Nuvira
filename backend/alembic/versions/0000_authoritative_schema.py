@@ -279,4 +279,3 @@ def downgrade() -> None:
         "concepts", "chapters", "users", "subject_packages", "plans", "audit_log",
     ):
         op.drop_table(table)
-

@@ -113,4 +113,3 @@ Run the adoption check against the restored database, not production.
 ## Owner-controlled production inspection procedure
 
 If later authorized, use read-only credentials to collect table/column/index/constraint and Alembic-version metadata plus the duplicate-email query. Do not run the adoption tool with `--apply-stamp`, migrations, DDL, or backup commands until the owner separately authorizes the controlled deployment window.
-

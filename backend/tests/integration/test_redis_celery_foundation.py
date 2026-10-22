@@ -20,4 +20,3 @@ def test_worker_registration_ping_and_result_persistence():
     assert registered and any("app.workers.tasks.ping" in tasks for tasks in registered.values())
     result = celery_app.send_task("app.workers.tasks.ping")
     assert result.get(timeout=20) == "pong"
-

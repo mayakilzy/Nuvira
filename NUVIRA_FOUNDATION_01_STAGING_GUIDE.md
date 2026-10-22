@@ -139,4 +139,3 @@ Never run `down --volumes` against `docker-compose.yml` or the production projec
 - Worker unhealthy: compare the worker hostname with `foundation-worker@$HOSTNAME`, then inspect Redis and task registration.
 - Frontend calls production: rebuild frontend with the staging `PUBLIC_API_URL`; runtime environment alone cannot replace a compiled `NEXT_PUBLIC_*` value.
 - Playwright browser exits before tests: increase host paging/virtual memory or run on a CI runner with supported Chromium resources.
-

@@ -111,4 +111,3 @@ networks:
   staging_internal:
     name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_internal
     driver: bridge
-

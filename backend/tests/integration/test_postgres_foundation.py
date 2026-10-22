@@ -110,4 +110,3 @@ def test_postgres_concurrent_duplicate_payment_event_grants_once(postgres_engine
         assert len(rows) == 1 and rows[0].amount == 100
     finally:
         verify.close()
-
