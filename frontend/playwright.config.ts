@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.FOUNDATION_FRONTEND_URL || "http://127.0.0.1:3300";
 const channel = process.env.PLAYWRIGHT_CHANNEL;
@@ -8,11 +8,15 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: false,
   retries: 0,
-  reporter: [["list"]],
+  reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   use: {
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     ...(channel ? { channel } : {}),
   },
+  projects: channel ? [{ name: "configured-browser", use: { channel } }] : [
+    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
+  ],
 });

@@ -45,3 +45,18 @@ def test_staging_preflight_rejects_production_identifiers_and_placeholders(tmp_p
     errors = verify(root, env_path)
     assert any("production identifier" in error for error in errors)
     assert any("CHANGE_ME" in error for error in errors)
+
+
+def test_staging_preflight_requires_resource_limits_and_disabled_integrations(tmp_path):
+    template = (ROOT / ".env.staging.example").read_text(encoding="utf-8")
+    env = template.replace(
+        "CHANGE_ME_STAGING_DATABASE_PASSWORD", "synthetic-staging-database-password"
+    ).replace(
+        "CHANGE_ME_WITH_A_STAGING_ONLY_RANDOM_VALUE_OF_AT_LEAST_64_CHARACTERS",
+        "synthetic-staging-jwt-secret-000000000000000000000000000000000000000000000000",
+    ).replace(
+        "CHANGE_ME_STAGING_ADMIN_PASSWORD", "synthetic-admin-password-not-enabled"
+    ).replace("PAYMENTS_ENABLED=false", "PAYMENTS_ENABLED=true")
+    env_path = tmp_path / ".env.staging"
+    env_path.write_text(env, encoding="utf-8")
+    assert any("PAYMENTS_ENABLED must default to false" in error for error in verify(ROOT, env_path))

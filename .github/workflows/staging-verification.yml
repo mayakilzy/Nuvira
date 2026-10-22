@@ -1,0 +1,212 @@
+name: Nuvira STAGING-01 verification
+
+on:
+  push:
+    branches: [test/nuvira-staging-01]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuvira-staging-01-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-staging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_FILE: docker-compose.staging.yml
+      STAGING_ENV_FILE: .env.staging
+
+    steps:
+      - name: Check out the tested revision
+        uses: actions/checkout@v4
+
+      - name: Record runner capacity and tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .staging-artifacts
+          {
+            uname -a
+            free -h
+            df -h /
+            docker version
+            docker compose version
+            node --version
+            npm --version
+            python3 --version
+          } | tee .staging-artifacts/environment.txt
+
+      - name: Create ephemeral staging-only configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          db_password="$(openssl rand -hex 24)"
+          jwt_secret="$(openssl rand -hex 48)"
+          admin_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$db_password"
+          echo "::add-mask::$jwt_secret"
+          echo "::add-mask::$admin_password"
+          cp .env.staging.example .env.staging
+          sed -i "s/CHANGE_ME_STAGING_DATABASE_PASSWORD/$db_password/g" .env.staging
+          sed -i "s/CHANGE_ME_WITH_A_STAGING_ONLY_RANDOM_VALUE_OF_AT_LEAST_64_CHARACTERS/$jwt_secret/g" .env.staging
+          sed -i "s/CHANGE_ME_STAGING_ADMIN_PASSWORD/$admin_password/g" .env.staging
+          echo "STAGING_DB_PASSWORD=$db_password" >> "$GITHUB_ENV"
+
+      - name: Run isolation preflight and Compose validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/staging/verify_isolation.py --env-file .env.staging
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --quiet
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --services | tee .staging-artifacts/services.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --volumes | tee .staging-artifacts/volumes.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --networks | tee .staging-artifacts/networks.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml config --images | tee .staging-artifacts/images.txt
+
+      - name: Enable only the local document-processing fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i "s/UPLOADS_ENABLED=false/UPLOADS_ENABLED=true/" .env.staging
+          sed -i "s/EMBEDDING_PROVIDER=openai/EMBEDDING_PROVIDER=deterministic-test/" .env.staging
+          sed -i "s/MAX_UPLOAD_BYTES=52428800/MAX_UPLOAD_BYTES=1048576/" .env.staging
+
+      - name: Build and start the isolated five-service stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.staging -f docker-compose.staging.yml build
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --wait --wait-timeout 300
+          docker compose --env-file .env.staging -f docker-compose.staging.yml ps --format json | tee .staging-artifacts/containers.json
+
+      - name: Verify runtime health, ports, labels, networks and volumes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:8800/health | tee .staging-artifacts/backend-health.json
+          curl -fsS http://127.0.0.1:8800/health/db | tee .staging-artifacts/backend-db-health.json
+          curl -fsS http://127.0.0.1:3300/ >/dev/null
+          test -z "$(docker compose --env-file .env.staging -f docker-compose.staging.yml port db 5432 2>/dev/null || true)"
+          test -z "$(docker compose --env-file .env.staging -f docker-compose.staging.yml port redis 6379 2>/dev/null || true)"
+          for service in db redis backend worker frontend; do
+            container="$(docker compose --env-file .env.staging -f docker-compose.staging.yml ps -q "$service")"
+            test "$(docker inspect -f '{{ index .Config.Labels "com.nuvira.environment" }}' "$container")" = staging
+            docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$container"
+          done | sort -u | tee .staging-artifacts/runtime-networks.txt
+          docker volume ls --filter label=com.docker.compose.project=nuvira-foundation-staging --format '{{.Name}}' | sort | tee .staging-artifacts/runtime-volumes.txt
+          ! grep -Eiq '(^|[_-])nuvira_(postgres_data|redis_data|uploads)($|[_-])|hermes-network' .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-volumes.txt
+
+      - name: Verify PostgreSQL migrations and pgvector
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend alembic history | tee .staging-artifacts/alembic-history.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend alembic current | tee .staging-artifacts/alembic-current.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend alembic check | tee .staging-artifacts/alembic-check.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            psql -U nuvira_staging -d nuvira_staging -Atc "SELECT extname FROM pg_extension WHERE extname='vector'" | tee .staging-artifacts/pgvector.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            createdb -U nuvira_staging nuvira_foundation_test_run
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
+            -e FOUNDATION_POSTGRES_URL="postgresql+psycopg2://nuvira_staging:${STAGING_DB_PASSWORD}@db:5432/nuvira_foundation_test_run" \
+            backend pytest -q tests/integration/test_postgres_foundation.py | tee .staging-artifacts/postgres-tests.txt
+
+      - name: Run backend, Celery and document integration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend pytest -q | tee .staging-artifacts/backend-tests.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
+            -e FOUNDATION_CELERY_BROKER_URL=redis://redis:6379/1 \
+            -e FOUNDATION_CELERY_RESULT_BACKEND=redis://redis:6379/2 \
+            backend pytest -q tests/integration/test_redis_celery_foundation.py | tee .staging-artifacts/celery-tests.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
+            -e STAGING_API_URL=http://backend:8000 \
+            -e STAGING_FRONTEND_URL=http://127.0.0.1:3300 \
+            backend pytest -q tests/integration/test_staging_http_auth.py | tee .staging-artifacts/auth-http-tests.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
+            -e STAGING_API_URL=http://backend:8000 \
+            backend pytest -q tests/integration/test_staging_http_documents.py | tee .staging-artifacts/document-tests.txt
+
+      - name: Verify broker outage recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.staging -f docker-compose.staging.yml stop redis
+          docker compose --env-file .env.staging -f docker-compose.staging.yml start redis
+          for attempt in $(seq 1 30); do
+            if docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli ping | grep -q PONG; then break; fi
+            sleep 2
+          done
+          sleep 10
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T worker \
+            celery -A app.workers.celery_app inspect ping -d 'foundation-worker@*' --timeout=15 | tee .staging-artifacts/broker-recovery.txt
+
+      - name: Run desktop and mobile browser E2E
+        working-directory: frontend
+        env:
+          FOUNDATION_FRONTEND_URL: http://127.0.0.1:3300
+          FOUNDATION_API_URL: http://127.0.0.1:8800
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+      - name: Rehearse isolated backup and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .staging-private
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            pg_dump -U nuvira_staging -Fc --no-owner --no-acl nuvira_staging > .staging-private/database.dump
+          sha256sum .staging-private/database.dump | sed 's#.staging-private/##' | tee .staging-artifacts/database-backup.sha256
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            createdb -U nuvira_staging nuvira_staging_restore_test
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            pg_restore -U nuvira_staging --exit-on-error --no-owner --no-acl -d nuvira_staging_restore_test < .staging-private/database.dump
+          original_counts="$(docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db psql -U nuvira_staging -d nuvira_staging -Atc "SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM uploaded_documents; SELECT COUNT(*) FROM embeddings;")"
+          restored_counts="$(docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db psql -U nuvira_staging -d nuvira_staging_restore_test -Atc "SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM uploaded_documents; SELECT COUNT(*) FROM embeddings;")"
+          test "$original_counts" = "$restored_counts"
+          printf '%s\n' "$restored_counts" > .staging-artifacts/restored-record-counts.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T db \
+            psql -U nuvira_staging -d nuvira_staging_restore_test -Atc "SELECT version_num FROM alembic_version" | tee .staging-artifacts/restored-revision.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend \
+            tar -czf - -C /app/uploads . > .staging-private/uploads.tar.gz
+          sha256sum .staging-private/uploads.tar.gz | sed 's#.staging-private/##' | tee .staging-artifacts/uploads-backup.sha256
+          docker volume create --label com.nuvira.environment=staging nuvira-foundation-staging_uploads_restore_data >/dev/null
+          docker run --rm --network none -i -v nuvira-foundation-staging_uploads_restore_data:/restore alpine:3.21 \
+            sh -c 'tar -xzf - -C /restore' < .staging-private/uploads.tar.gz
+          docker run --rm --network none -v nuvira-foundation-staging_uploads_restore_data:/restore alpine:3.21 \
+            sh -c 'find /restore -type f | wc -l' | tee .staging-artifacts/restored-upload-count.txt
+          curl -fsS http://127.0.0.1:8800/health/db | tee .staging-artifacts/post-restore-original-health.json
+
+      - name: Collect failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          docker compose --env-file .env.staging -f docker-compose.staging.yml ps --format json > .staging-artifacts/failure-containers.json 2>&1 || true
+          docker compose --env-file .env.staging -f docker-compose.staging.yml logs --no-color --tail=300 > .staging-artifacts/failure-logs.txt 2>&1 || true
+
+      - name: Upload sanitized verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuvira-staging-01-evidence-${{ github.run_id }}
+          path: |
+            .staging-artifacts/
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop only the isolated staging project
+        if: always()
+        shell: bash
+        run: |
+          docker compose --env-file .env.staging -f docker-compose.staging.yml down --remove-orphans || true

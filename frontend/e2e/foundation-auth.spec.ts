@@ -15,6 +15,12 @@ test("register, restore, settings, logout and URL-token boundaries", async ({ pa
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 
+  const refreshCookie = (await page.context().cookies()).find(cookie => cookie.name === "nuvira_refresh");
+  expect(refreshCookie).toBeDefined();
+  expect(refreshCookie?.httpOnly).toBeTruthy();
+  expect(refreshCookie?.sameSite).toBe("Lax");
+  expect(refreshCookie?.secure).toBeFalsy();
+
   await page.reload();
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/settings");
@@ -37,4 +43,26 @@ test("register, restore, settings, logout and URL-token boundaries", async ({ pa
     headers: { Origin: frontend },
   });
   expect(rejected.status()).toBe(401);
+});
+
+test("invalid login is rejected without credentials in the URL", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(`missing-${Date.now()}@example.invalid`);
+  await page.getByLabel("Password").fill("SyntheticPass1234");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(page.url()).not.toMatch(/access_token|refresh_token/);
+});
+
+test("known limitation: zero-subject dashboard settings tab is blocked", async ({ page }) => {
+  test.fail(true, "Existing onboarding defect: the dashboard empty state masks settings content");
+  const email = `zero-subject-${Date.now()}@example.invalid`;
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("Zero Subject Student");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("SyntheticPass1234");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("button", { name: /Einstellungen|Settings|الإعدادات/ }).first().click();
+  await expect(page.getByRole("heading", { name: /Einstellungen|Settings|الإعدادات/ })).toBeVisible();
 });

@@ -5,6 +5,12 @@ name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}
 services:
   db:
     image: pgvector/pgvector:pg16
+    labels:
+      com.nuvira.environment: staging
+      com.nuvira.mission: staging-01
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 256
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nuvira_staging}
@@ -21,6 +27,12 @@ services:
 
   redis:
     image: redis:7-alpine
+    labels:
+      com.nuvira.environment: staging
+      com.nuvira.mission: staging-01
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 128
     restart: unless-stopped
     command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
     volumes:
@@ -33,7 +45,13 @@ services:
       retries: 12
 
   backend:
-    image: localdev/nuvira-foundation-backend:${STAGING_TAG:-security-01}
+    image: localdev/nuvira-staging-backend:${STAGING_TAG:-staging-01}
+    labels:
+      com.nuvira.environment: staging
+      com.nuvira.mission: staging-01
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 256
     build: ./backend
     init: true
     restart: unless-stopped
@@ -56,12 +74,18 @@ services:
       retries: 12
 
   worker:
-    image: localdev/nuvira-foundation-backend:${STAGING_TAG:-security-01}
+    image: localdev/nuvira-staging-backend:${STAGING_TAG:-staging-01}
+    labels:
+      com.nuvira.environment: staging
+      com.nuvira.mission: staging-01
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 256
     build: ./backend
     init: true
     restart: unless-stopped
     env_file: .env.staging
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--hostname=foundation-worker@%h"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--concurrency=1", "--hostname=foundation-worker@%h"]
     depends_on:
       backend:
         condition: service_healthy
@@ -77,7 +101,13 @@ services:
       retries: 8
 
   frontend:
-    image: localdev/nuvira-foundation-frontend:${STAGING_TAG:-security-01}
+    image: localdev/nuvira-staging-frontend:${STAGING_TAG:-staging-01}
+    labels:
+      com.nuvira.environment: staging
+      com.nuvira.mission: staging-01
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 256
     build:
       context: ./frontend
       args:

@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"  # changeable per project
     OPENAI_API_KEY: str = ""  # منفصل عن OPENROUTER — فقط لتوليد embeddings
+    EMBEDDING_PROVIDER: str = "openai"  # openai | deterministic-test (staging only)
     AI_ENABLED: bool = False
 
     # --- Email (Resend) ---
@@ -126,6 +127,10 @@ class Settings(BaseSettings):
                     errors.append("Active payment provider configuration is incomplete")
             if self.AI_ENABLED and not self.OPENROUTER_API_KEY:
                 errors.append("AI is enabled but OPENROUTER_API_KEY is missing")
+            if self.EMBEDDING_PROVIDER not in {"openai", "deterministic-test"}:
+                errors.append("EMBEDDING_PROVIDER must be openai or deterministic-test")
+            if self.ENV == "production" and self.EMBEDDING_PROVIDER != "openai":
+                errors.append("production must use the openai embedding provider")
             if self.EMAIL_ENABLED and not self.RESEND_API_KEY:
                 errors.append("Email is enabled but RESEND_API_KEY is missing")
             if errors:

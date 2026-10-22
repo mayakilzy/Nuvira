@@ -1,8 +1,5 @@
-"""
-Embedding generation — via OpenAI (text-embedding-3-small, dim=1536, matches
-settings.EMBEDDING_DIM). Separate API key from OPENROUTER_API_KEY, because
-OpenRouter does not serve embeddings.
-"""
+"""Embedding generation with a production provider and an offline staging seam."""
+import hashlib
 import httpx
 
 from app.config import settings
@@ -12,7 +9,27 @@ class EmbeddingServiceError(Exception):
     pass
 
 
+_transient_test_failures: set[str] = set()
+
+
+def _deterministic_test_embedding(text: str) -> list[float]:
+    """Return a stable local vector without sending staging content externally."""
+    if settings.ENV == "production":
+        raise EmbeddingServiceError("The deterministic test provider is forbidden in production")
+    marker = "NUVIRA_TRANSIENT_EMBEDDING_FAILURE"
+    if marker in text and text not in _transient_test_failures:
+        _transient_test_failures.add(text)
+        raise EmbeddingServiceError("Controlled transient staging failure")
+    digest = hashlib.sha256(text.encode("utf-8")).digest()
+    return [
+        ((digest[index % len(digest)] / 255.0) * 2.0) - 1.0
+        for index in range(settings.EMBEDDING_DIM)
+    ]
+
+
 async def get_embedding(text: str) -> list[float]:
+    if settings.EMBEDDING_PROVIDER == "deterministic-test":
+        return _deterministic_test_embedding(text)
     if not settings.OPENAI_API_KEY:
         raise EmbeddingServiceError("OPENAI_API_KEY is not configured")
 
