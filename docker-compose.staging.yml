@@ -1,0 +1,114 @@
+# Fully isolated local FOUNDATION-01 staging stack.
+# Run only with: docker compose --env-file .env.staging -f docker-compose.staging.yml ...
+name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nuvira_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a staging-only POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-nuvira_staging}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [staging_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nuvira_staging} -d ${POSTGRES_DB:-nuvira_staging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks: [staging_internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    image: localdev/nuvira-foundation-backend:${STAGING_TAG:-security-01}
+    build: ./backend
+    init: true
+    restart: unless-stopped
+    env_file: .env.staging
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "127.0.0.1:${STAGING_BACKEND_PORT:-8800}:8000"
+    networks: [staging_internal]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health/db',timeout=5)); assert d=={'database':'ok'}"]
+      interval: 10s
+      timeout: 7s
+      retries: 12
+
+  worker:
+    image: localdev/nuvira-foundation-backend:${STAGING_TAG:-security-01}
+    build: ./backend
+    init: true
+    restart: unless-stopped
+    env_file: .env.staging
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--hostname=foundation-worker@%h"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    networks: [staging_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d foundation-worker@$$HOSTNAME --timeout=10 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 8
+
+  frontend:
+    image: localdev/nuvira-foundation-frontend:${STAGING_TAG:-security-01}
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:8800}
+    init: true
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://127.0.0.1:8800}
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${STAGING_FRONTEND_PORT:-3300}:3000"
+    networks: [staging_internal]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 7s
+      retries: 12
+
+volumes:
+  postgres_data:
+    name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_postgres_data
+  redis_data:
+    name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_redis_data
+  uploads_data:
+    name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_uploads_data
+
+networks:
+  staging_internal:
+    name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_internal
+    driver: bridge
+

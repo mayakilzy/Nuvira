@@ -65,7 +65,7 @@ services:
     build: ./backend
     restart: unless-stopped
     env_file: .env
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--hostname=nuvira-worker@%h"]
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -75,7 +75,7 @@ services:
         condition: service_healthy
     networks: [internal]
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME --timeout=10 | grep -q pong"]
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d nuvira-worker@$$HOSTNAME --timeout=10 | grep -q pong"]
       interval: 30s
       timeout: 15s
       retries: 5

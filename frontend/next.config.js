@@ -2,8 +2,9 @@
 const nextConfig = {
   output: "standalone", // produces a minimal self-contained server for Docker
   turbopack: { root: __dirname },
+  agentRules: false,
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "https://api.nuvira.agentcraft.info",
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000",
   },
 };
 module.exports = nextConfig;
