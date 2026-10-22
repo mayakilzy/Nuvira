@@ -11,6 +11,7 @@ from app.config import settings
 from app.models.plans import Plan
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.commerce import CreditPack
 from app.services.payments.base import CheckoutResult, PaymentProvider, WebhookEvent
 
 API = "https://api.lemonsqueezy.com/v1"
@@ -56,8 +57,10 @@ class LemonSqueezyProvider(PaymentProvider):
             raise RuntimeError(f"No lemonsqueezy variant id on plan '{plan.slug}' for {interval}")
         return await self._create_checkout(variant_id, user, {"user_id": str(user.id), "plan": plan.slug})
 
-    async def create_credit_checkout(self, db: Session, user: User, price_id: str, credits: int) -> CheckoutResult:
-        return await self._create_checkout(price_id, user, {"user_id": str(user.id), "credits": str(credits)})
+    async def create_credit_checkout(self, db: Session, user: User, pack: CreditPack) -> CheckoutResult:
+        return await self._create_checkout(
+            pack.provider_price_id, user, {"user_id": str(user.id), "pack_slug": pack.slug}
+        )
 
     async def create_portal(self, db: Session, user: User) -> CheckoutResult:
         sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
@@ -87,7 +90,7 @@ class LemonSqueezyProvider(PaymentProvider):
         sub_id = body.get("data", {}).get("id")
         user_id = int(custom["user_id"]) if custom.get("user_id") else None
 
-        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=event_name,
+        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=event_name, provider=self.name,
                           provider_subscription_id=sub_id)
 
         if event_name in ("subscription_created", "subscription_updated", "subscription_payment_success"):
@@ -97,8 +100,8 @@ class LemonSqueezyProvider(PaymentProvider):
             ev.reference_id = str(attrs.get("renews_at") or sub_id)
         elif event_name in ("subscription_cancelled", "subscription_expired"):
             ev.type = "subscription_cancelled"
-        elif event_name == "order_created" and custom.get("credits"):
+        elif event_name == "order_created" and custom.get("pack_slug"):
             ev.type = "credits_purchased"
-            ev.credits = int(custom["credits"])
+            ev.pack_slug = custom["pack_slug"]
             ev.reference_id = str(body.get("data", {}).get("id"))
         return ev

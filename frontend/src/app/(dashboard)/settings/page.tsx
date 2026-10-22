@@ -38,7 +38,7 @@ export default function Settings() {
 
       <div className="card card-pad" style={{ maxWidth: 480, marginTop: 20, borderColor: "var(--danger-soft)" }}>
         <h3 style={{ fontSize: 16, marginBottom: 6 }}>Delete account</h3>
-        <p className="muted" style={{ fontSize: 14, marginBottom: 14 }}>Permanently remove your account and all data.</p>
+        <p className="muted" style={{ fontSize: 14, marginBottom: 14 }}>Disables the account, removes private learning data and uploaded files, and queues a retry if cleanup cannot finish immediately. Minimal payment and audit records may be anonymized and retained where required.</p>
         <button className="btn btn-danger" onClick={delAccount}>Delete account</button>
       </div>
     </>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { setTokens } from "@/lib/api";
+import { api, setTokens } from "@/lib/api";
 import { Field, Alert } from "@/components/ui";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8995";
@@ -13,11 +13,18 @@ export default function Login() {
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
 
-  // Google OAuth returns tokens in the URL — capture them.
+  // OAuth returns a short-lived, single-use exchange code; bearer tokens never enter the URL.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const at = p.get("access_token"), rt = p.get("refresh_token");
-    if (at && rt) { setTokens({ access_token: at, refresh_token: rt }); router.push("/dashboard"); }
+    const code = p.get("oauth_code");
+    if (!code) return;
+    window.history.replaceState({}, "", "/login");
+    api.post("/auth/oauth/exchange", { code })
+      .then((response) => {
+        setTokens(response.data);
+        router.replace(response.data.return_path || "/dashboard");
+      })
+      .catch(() => setErr("Google sign-in could not be completed. Please try again."));
   }, [router]);
 
   async function submit(e: React.FormEvent) {

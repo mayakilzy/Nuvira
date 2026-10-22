@@ -8,6 +8,7 @@ from app.config import settings
 from app.models.plans import Plan
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.commerce import CreditPack
 from app.services.payments.base import CheckoutResult, PaymentProvider, WebhookEvent
 
 
@@ -32,12 +33,12 @@ class StripeProvider(PaymentProvider):
         )
         return CheckoutResult(url=session.url)
 
-    async def create_credit_checkout(self, db: Session, user: User, price_id: str, credits: int) -> CheckoutResult:
+    async def create_credit_checkout(self, db: Session, user: User, pack: CreditPack) -> CheckoutResult:
         session = stripe.checkout.Session.create(
             mode="payment",
-            line_items=[{"price": price_id, "quantity": 1}],
+            line_items=[{"price": pack.provider_price_id, "quantity": 1}],
             customer_email=user.email,
-            metadata={"user_id": str(user.id), "credits": str(credits)},
+            metadata={"user_id": str(user.id), "pack_slug": pack.slug},
             success_url=f"{settings.FRONTEND_URL}/billing?status=success",
             cancel_url=f"{settings.FRONTEND_URL}/billing?status=cancel",
         )
@@ -61,11 +62,11 @@ class StripeProvider(PaymentProvider):
         meta = obj.get("metadata", {}) or {}
         user_id = int(meta["user_id"]) if meta.get("user_id") else None
 
-        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=etype)
+        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=etype, provider=self.name)
         if etype == "checkout.session.completed":
-            if obj.get("mode") == "payment" and meta.get("credits"):
+            if obj.get("mode") == "payment" and meta.get("pack_slug"):
                 ev.type = "credits_purchased"
-                ev.credits = int(meta["credits"])
+                ev.pack_slug = meta["pack_slug"]
                 ev.reference_id = obj.get("id")
             else:
                 ev.type = "subscription_active"

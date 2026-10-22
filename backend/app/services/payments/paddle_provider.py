@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.plans import Plan
 from app.models.user import User
+from app.models.commerce import CreditPack
 from app.services.payments.base import CheckoutResult, PaymentProvider, WebhookEvent
 
 
@@ -44,8 +45,10 @@ class PaddleProvider(PaymentProvider):
             raise RuntimeError(f"No paddle price id on plan '{plan.slug}' for {interval}")
         return await self._create_txn(price_id, user, {"user_id": str(user.id), "plan": plan.slug})
 
-    async def create_credit_checkout(self, db: Session, user: User, price_id: str, credits: int) -> CheckoutResult:
-        return await self._create_txn(price_id, user, {"user_id": str(user.id), "credits": str(credits)})
+    async def create_credit_checkout(self, db: Session, user: User, pack: CreditPack) -> CheckoutResult:
+        return await self._create_txn(
+            pack.provider_price_id, user, {"user_id": str(user.id), "pack_slug": pack.slug}
+        )
 
     async def create_portal(self, db: Session, user: User) -> CheckoutResult:
         # Paddle Billing manages via API/links; expose a management URL per your setup.
@@ -69,17 +72,17 @@ class PaddleProvider(PaymentProvider):
         custom = data.get("custom_data") or {}
         user_id = int(custom["user_id"]) if custom.get("user_id") else None
 
-        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=etype,
+        ev = WebhookEvent(type="ignored", user_id=user_id, raw_type=etype, provider=self.name,
                           provider_subscription_id=data.get("id"))
-        if etype in ("subscription.activated", "subscription.updated", "transaction.completed") and not custom.get("credits"):
+        if etype in ("subscription.activated", "subscription.updated", "transaction.completed") and not custom.get("pack_slug"):
             ev.type = "subscription_active"
             ev.status = "active"
             ev.plan_slug = custom.get("plan")
             ev.reference_id = str(data.get("id"))
         elif etype in ("subscription.canceled", "subscription.paused"):
             ev.type = "subscription_cancelled"
-        elif etype == "transaction.completed" and custom.get("credits"):
+        elif etype == "transaction.completed" and custom.get("pack_slug"):
             ev.type = "credits_purchased"
-            ev.credits = int(custom["credits"])
+            ev.pack_slug = custom["pack_slug"]
             ev.reference_id = str(data.get("id"))
         return ev

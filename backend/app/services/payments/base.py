@@ -17,11 +17,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.models.credits import CreditLedger
 from app.models.plans import Plan
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.commerce import CreditPack, PaymentEvent
 
 
 @dataclass
@@ -41,6 +43,8 @@ class WebhookEvent:
     period_start: datetime | None = None
     period_end: datetime | None = None
     credits: int = 0
+    provider: str = "unknown"
+    pack_slug: str | None = None
     reference_id: str | None = None          # invoice/period/order id (idempotency key)
     provider_customer_id: str | None = None
     provider_subscription_id: str | None = None
@@ -56,7 +60,7 @@ class PaymentProvider(ABC):
         ...
 
     @abstractmethod
-    async def create_credit_checkout(self, db: Session, user: User, price_id: str, credits: int) -> CheckoutResult:
+    async def create_credit_checkout(self, db: Session, user: User, pack: CreditPack) -> CheckoutResult:
         ...
 
     @abstractmethod
@@ -123,12 +127,28 @@ def fulfill(db: Session, ev: WebhookEvent) -> None:
     if ev.type == "ignored" or ev.user_id is None:
         return
 
+    if not ev.reference_id:
+        return
+    db.add(PaymentEvent(
+        provider=ev.provider,
+        event_id=ev.reference_id,
+        event_type=ev.type,
+        user_id=ev.user_id,
+    ))
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        return
+
     if ev.type == "subscription_active":
         ev.status = ev.status or "active"
         _upsert_subscription(db, ev)
         # grant the plan's monthly credits (once per billing period via reference_id)
         plan = db.query(Plan).filter(Plan.slug == ev.plan_slug).first() if ev.plan_slug else None
-        credits = plan.credits_per_month if plan else ev.credits
+        # Never fall back to a quantity supplied by provider metadata. Credits
+        # are granted only from a server-owned, active plan definition.
+        credits = plan.credits_per_month if plan and plan.is_active else 0
         _grant(db, ev.user_id, credits, "subscription_grant",
                f"plan:{ev.plan_slug}", ev.reference_id)
 
@@ -137,7 +157,15 @@ def fulfill(db: Session, ev: WebhookEvent) -> None:
         _upsert_subscription(db, ev)
 
     elif ev.type == "credits_purchased":
-        _grant(db, ev.user_id, ev.credits, "purchase",
-               "credit pack", ev.reference_id)
+        pack = db.query(CreditPack).filter(
+            CreditPack.slug == ev.pack_slug,
+            CreditPack.provider == ev.provider,
+            CreditPack.is_active.is_(True),
+        ).first()
+        if not pack:
+            db.rollback()
+            return
+        _grant(db, ev.user_id, pack.credits, "purchase",
+               f"credit-pack:{pack.slug}", ev.reference_id)
 
     db.commit()

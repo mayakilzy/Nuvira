@@ -25,7 +25,10 @@ def seed(db: Session) -> None:
         if not db.query(Plan).filter(Plan.slug == spec["slug"]).first():
             db.add(Plan(**spec))
     # first admin (emails are case-insensitive — normalize before lookup)
-    email = settings.FIRST_ADMIN_EMAIL.strip().lower() if settings.FIRST_ADMIN_EMAIL else ""
+    email = (
+        settings.FIRST_ADMIN_EMAIL.strip().lower()
+        if settings.FIRST_ADMIN_ENABLED and settings.FIRST_ADMIN_EMAIL else ""
+    )
     if email and not db.query(User).filter(User.email == email).first():
         db.add(User(
             email=email,

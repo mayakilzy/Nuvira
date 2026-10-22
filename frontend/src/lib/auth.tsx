@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, setTokens, clearTokens, getTokens } from "./api";
+import { api, setTokens, clearTokens } from "./api";
 
 export type User = {
   id: number; email: string; full_name?: string; role: string;
@@ -12,7 +12,7 @@ type Ctx = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, full_name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -23,22 +23,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function refresh() {
-    if (!getTokens()) { setUser(null); setLoading(false); return; }
-    try { const r = await api.get("/auth/me"); setUser(r.data); }
-    catch { setUser(null); }
-    finally { setLoading(false); }
+    try {
+      const response = await api.get("/auth/me");
+      setUser(response.data);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { refresh(); }, []);
 
   async function login(email: string, password: string) {
-    const r = await api.post("/auth/login", { email, password });
-    setTokens(r.data); await refresh();
+    const response = await api.post("/auth/login", { email, password });
+    setTokens(response.data);
+    await refresh();
   }
   async function register(email: string, password: string, full_name?: string) {
-    const r = await api.post("/auth/register", { email, password, full_name });
-    setTokens(r.data); await refresh();
+    const response = await api.post("/auth/register", { email, password, full_name });
+    setTokens(response.data);
+    await refresh();
   }
-  function logout() { clearTokens(); setUser(null); window.location.href = "/login"; }
+  async function logout() {
+    try { await api.post("/auth/logout"); } finally {
+      clearTokens();
+      setUser(null);
+      window.location.href = "/login";
+    }
+  }
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>

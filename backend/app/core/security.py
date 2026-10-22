@@ -5,7 +5,10 @@ This is part of the "stable infrastructure" — it does not change between proje
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import jwt, JWTError
+import uuid
+
+import jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 
 from app.config import settings
@@ -28,6 +31,7 @@ def _create_token(subject: str, expires_delta: timedelta, token_type: str) -> st
         "type": token_type,
         "iat": now,
         "exp": now + expires_delta,
+        "jti": uuid.uuid4().hex,
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
@@ -40,16 +44,13 @@ def create_access_token(subject: str) -> str:
     )
 
 
-def create_refresh_token(subject: str) -> str:
-    return _create_token(
-        subject,
-        timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        "refresh",
-    )
-
-
 def decode_token(token: str) -> dict | None:
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError:
+        return jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=["HS256"],
+            options={"require": ["exp", "iat", "sub", "type", "jti"]},
+        )
+    except InvalidTokenError:
         return None

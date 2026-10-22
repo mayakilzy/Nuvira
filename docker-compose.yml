@@ -74,6 +74,11 @@ services:
       redis:
         condition: service_healthy
     networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME --timeout=10 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
 
   frontend:
     image: localdev/nuvira-frontend:1.0.0
@@ -84,6 +89,7 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-https://api.nuvira.agentcraft.info}
+      HOSTNAME: 0.0.0.0
     depends_on:
       backend:
         condition: service_healthy

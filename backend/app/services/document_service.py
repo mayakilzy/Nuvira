@@ -2,9 +2,12 @@
 Document processing — استخراج نص من PDF/PPTX، تقطيع لقطع صغيرة، تحويل كل قطعة
 لـ embedding مرتبط بالفصل والمادة، مع تحديث حالة الملف بقاعدة البيانات.
 """
+import logging
+
 from sqlalchemy.orm import Session
 
 from app.models.content import UploadedDocument
+from app.models.embedding import Embedding
 from app.services import embedding_service, vector_service
 
 
@@ -13,7 +16,7 @@ def extract_text(path: str) -> str:
         from pypdf import PdfReader
         reader = PdfReader(path)
         return "\n".join(page.extract_text() or "" for page in reader.pages)
-    elif path.lower().endswith((".pptx", ".ppt")):
+    elif path.lower().endswith(".pptx"):
         from pptx import Presentation
         prs = Presentation(path)
         chunks = []
@@ -44,8 +47,20 @@ async def process_document(db: Session, document_id: int):
         return
 
     try:
+        previous_attempts = getattr(doc, "processing_attempts", 0) or 0
+        doc.processing_attempts = previous_attempts + 1
+        doc.status = "processing"
+        doc.error_code = None
+        doc.error_note = None
+        if previous_attempts:
+            db.query(Embedding).filter(Embedding.document_id == doc.id).delete(
+                synchronize_session=False
+            )
+        db.commit()
         text = extract_text(doc.storage_path)
         chunks = chunk_text(text)
+        if not chunks:
+            raise ValueError("No extractable text")
 
         for chunk in chunks:
             vector = await embedding_service.get_embedding(chunk)
@@ -62,9 +77,19 @@ async def process_document(db: Session, document_id: int):
 
         doc.status = "ready"
         doc.chunk_count = len(chunks)
+        doc.error_code = None
+        doc.error_note = None
         db.commit()
 
-    except Exception as e:
+    except Exception:
+        logging.exception("Document processing failed", extra={"document_id": document_id})
+        db.rollback()
+        db.query(Embedding).filter(Embedding.document_id == doc.id).delete(
+            synchronize_session=False
+        )
         doc.status = "failed"
-        doc.error_note = str(e)[:500]
+        doc.error_code = "DOCUMENT_PROCESSING_FAILED"
+        doc.error_note = "Processing failed. Retry or replace this file."
+        doc.chunk_count = 0
         db.commit()
+        raise

@@ -25,12 +25,12 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
                 conn.commit()
     except Exception as e:
+        if settings.ENV == "production":
+            raise
         print(f"[startup] vector extension: {e}")
-    # create_all is idempotent (creates only missing tables); safe on every boot.
-    try:
+    # Development convenience only. Production schema must come from Alembic.
+    if settings.ENV != "production":
         Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"[startup] create_all: {e}")
     # Seed default plans + first admin (idempotent).
     try:
         from app.core.seed import seed
@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
     except Exception as e:
+        if settings.ENV == "production":
+            raise
         print(f"[seed] skipped: {e}")
     yield
 
