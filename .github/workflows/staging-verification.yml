@@ -174,13 +174,27 @@ jobs:
           set -euo pipefail
           docker compose --env-file .env.staging -f docker-compose.staging.yml stop redis
           docker compose --env-file .env.staging -f docker-compose.staging.yml start redis
+          redis_recovered=false
           for attempt in $(seq 1 30); do
-            if docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli ping | grep -q PONG; then break; fi
+            if docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T redis redis-cli ping | grep -q PONG; then
+              redis_recovered=true
+              break
+            fi
             sleep 2
           done
-          sleep 10
-          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T worker \
-            celery -A app.workers.celery_app inspect ping -d 'foundation-worker@*' --timeout=15 | tee .staging-artifacts/broker-recovery.txt
+          test "$redis_recovered" = true
+          worker_recovered=false
+          worker_ping=''
+          for attempt in $(seq 1 12); do
+            if worker_ping="$(docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T worker \
+              celery -A app.workers.celery_app inspect ping --timeout=10 2>&1)" && grep -q pong <<< "$worker_ping"; then
+              worker_recovered=true
+              break
+            fi
+            sleep 5
+          done
+          printf '%s\n' "$worker_ping" | tee .staging-artifacts/broker-recovery.txt
+          test "$worker_recovered" = true
 
       - name: Run desktop and mobile browser E2E
         working-directory: frontend
