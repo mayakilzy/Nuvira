@@ -58,10 +58,14 @@ def _type_family(value) -> str:
     return aliases.get(name, name)
 
 
-def _signature(column: dict) -> tuple[str, bool, bool, int | None]:
+def _signature(
+    column: dict, *, primary_key: bool | None = None,
+) -> tuple[str, bool, bool, int | None]:
     type_name = _type_family(column["type"])
     length = getattr(column["type"], "length", None)
-    return type_name, bool(column["nullable"]), bool(column.get("primary_key")), length
+    if primary_key is None:
+        primary_key = bool(column.get("primary_key"))
+    return type_name, bool(column["nullable"]), primary_key, length
 
 
 def _expected_tables(profile: str) -> set[str]:
@@ -156,7 +160,15 @@ def _compare_profile(engine: Engine, profile: str) -> list[str]:
     if unexpected := sorted(actual_tables - expected_tables):
         errors.append("unexpected tables: " + ", ".join(unexpected))
     for table_name in sorted(expected_tables & actual_tables):
-        actual_columns = {column["name"]: _signature(column) for column in inspector.get_columns(table_name)}
+        primary_key_columns = set(
+            (inspector.get_pk_constraint(table_name) or {}).get("constrained_columns") or []
+        )
+        actual_columns = {
+            column["name"]: _signature(
+                column, primary_key=column["name"] in primary_key_columns,
+            )
+            for column in inspector.get_columns(table_name)
+        }
         expected_columns = _expected_columns(table_name, profile, engine.dialect.name)
         if set(actual_columns) != set(expected_columns):
             errors.append(
