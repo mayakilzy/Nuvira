@@ -24,3 +24,16 @@ def test_enabled_provider_requires_its_secrets():
             _env_file=None, ENV="production", DEBUG=False, JWT_SECRET="x" * 64,
             PAYMENTS_ENABLED=True, PAYMENT_PROVIDER="stripe",
         )
+
+
+def test_staging_uses_the_same_fail_closed_security_contract():
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None, ENV="staging", DEBUG=False,
+            JWT_SECRET="CHANGE_ME_WITH_A_STAGING_ONLY_RANDOM_VALUE_OF_AT_LEAST_64_CHARACTERS",
+        )
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None, ENV="staging", DEBUG=False, JWT_SECRET="x" * 64,
+            EMBEDDING_DIM=3072,
+        )
