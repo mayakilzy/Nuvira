@@ -22,7 +22,9 @@ def test_register_mixed_case_then_login_lowercase(client):
     assert r2.status_code == 200, r2.text
     body = r2.json()
     assert body["token_type"] == "bearer"
-    assert body["access_token"] and body["refresh_token"]
+    assert body["access_token"]
+    assert "refresh_token" not in body
+    assert client.cookies.get("nuvira_refresh")
 
 
 def test_stored_email_is_normalized_to_lowercase(client):

@@ -4,6 +4,10 @@ Shared test fixtures.
 Uses an in-memory SQLite database (only tables that don't need pgvector),
 so unit tests never touch Postgres. External calls (email/Resend) are mocked.
 """
+import os
+
+os.environ.setdefault("JWT_SECRET", "test-only-jwt-secret-which-is-longer-than-sixty-four-characters-000001")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -13,7 +17,9 @@ from sqlalchemy.pool import StaticPool
 from app.database import get_db
 from app.main import app
 from app.models.user import User
+from app.models.security import RefreshSession
 from app.services import email_service
+from app.core import ratelimit
 
 # One shared in-memory DB for the whole test session (StaticPool keeps the
 # connection alive). Only the users table is created here — auth tests don't
@@ -42,6 +48,10 @@ def client():
     """FastAPI test client with a clean users table per test."""
     User.__table__.drop(engine, checkfirst=True)
     User.__table__.create(engine)
+    RefreshSession.__table__.drop(engine, checkfirst=True)
+    RefreshSession.__table__.create(engine)
+    ratelimit._hits.clear()
+    ratelimit._auth_hits.clear()
     return TestClient(app)
 
 
