@@ -47,6 +47,7 @@ The application is online and its database health endpoint responds successfully
 | Public frontend `HEAD https://nuvira.agentcraft.info/` | PASS — HTTP 200 |
 | Public API `GET /health` | PASS — `Nuvira`, `production` |
 | Public API `GET /health/db` | PASS — `database: ok` |
+| GitHub Dependabot open-alert query | 54 open — 5 critical, 26 high, 19 medium, 4 low; 44 npm and 10 pip |
 | Authenticated production journey | NOT RUN — would require creating or using production student data |
 | OpenRouter and embedding calls | NOT RUN — external credentials/paid services required |
 | Redis/Celery document completion | NOT RUN — no isolated Docker runtime on the audit host |
@@ -199,6 +200,7 @@ Not implemented or blocked:
 
 | Severity | Finding | Evidence and consequence |
 |---|---|---|
+| CRITICAL | Open dependency advisories include RCE and JWT algorithm-confusion classes | GitHub reports 54 open Dependabot alerts. Critical alerts affect `python-jose` (`GHSA-6c5p-j8vq-pqhj`, fixed in 3.4.0; `GHSA-3qf3-8w2g-rqmx`, no patched version recorded) and Next.js (`GHSA-p293-qw3h-jr36`, `GHSA-2xp9-vwfh-vxw4`, fixed in 16.3.3; `GHSA-vcvr-r3jv-pc5j`, fixed in 16.3.6). 53 of 54 alerts report a patch; upgrades/replacement require compatibility and regression testing. |
 | CRITICAL | Client-controlled credit quantity | `POST /billing/buy-credits` accepts arbitrary `price_id` and `credits` (`backend/app/routers/billing.py:49-61`). Providers echo both into signed metadata and fulfillment grants the supplied amount. A cheap valid price could be paired with an arbitrary credit quantity. |
 | HIGH | OAuth access and refresh tokens in redirect URL | Backend redirects to `/login?access_token=...&refresh_token=...` and frontend reads them (`backend/app/routers/auth.py:173-175`; `frontend/src/app/login/page.tsx:16-21`). Tokens can reach browser history, logs, screenshots and referrers. The previously reported vulnerability still exists. |
 | HIGH | OAuth login-CSRF/state protection absent | Consent URL defaults `state` to an empty string and callback does not accept or validate state (`backend/app/services/oauth_service.py:15-25`; `backend/app/routers/auth.py:155-175`). |
@@ -232,6 +234,7 @@ These are reconciliation items only; this audit did not modify Compose or produc
 - Personal material path for a student without an entitlement: `BLOCKED`.
 - Commercial subscription-to-entitlement automation: `MISSING`.
 - Secure production authentication/payment posture: `BLOCKED` by critical/high findings.
+- Dependency security gate: `BLOCKED` by 54 open Dependabot alerts, including five critical advisories.
 - Fresh database deployment: `BLOCKED` by incomplete migrations.
 - Production modification readiness: not authorized and not recommended.
 

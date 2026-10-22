@@ -75,6 +75,7 @@ Passing compilation is not treated as functional verification.
 | Credit-pack server pricing | Direct source trace | FAIL — client controls credit grant |
 | Refresh revocation/logout | Direct source trace | MISSING |
 | Production-secret fail-closed validation | Direct source trace | MISSING |
+| Dependency vulnerability posture | GitHub Dependabot API: 54 open alerts (5 critical/26 high/19 medium/4 low); critical `python-jose` and Next.js advisories | BLOCKED |
 
 ## Database and deployment connection matrix
 

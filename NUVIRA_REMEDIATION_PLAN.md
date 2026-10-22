@@ -23,6 +23,7 @@ Visual redesign is deliberately deferred. Existing styling can support the first
 
 | Priority | Blocker | Required disposition |
 |---|---|---|
+| P0 | 54 open Dependabot alerts, including five critical advisories in Next.js and `python-jose` | Patch compatible dependencies; replace `python-jose` if the unpatched critical advisory remains applicable; run full auth/build/E2E regression |
 | P0 | Arbitrary credit grants through client-controlled `price_id` + `credits` | Disable or redesign credit-pack endpoint before enabling payments |
 | P0 | OAuth access/refresh tokens in query string | Replace callback handoff before production OAuth use |
 | P0 | Missing OAuth state verification | Add cryptographically bound, expiring state/PKCE flow |
@@ -38,18 +39,19 @@ Visual redesign is deliberately deferred. Existing styling can support the first
 
 ### Backend changes
 
-1. Replace `buy-credits {price_id, credits}` with a server-owned `credit_pack_id`.
-2. Resolve provider price and credit quantity from an approved database/config record; never trust either value from the browser or webhook custom metadata alone.
-3. Add database uniqueness on provider event/reference IDs and transaction-safe idempotency.
-4. Replace OAuth token query parameters with one of:
+1. Triage all 54 GitHub Dependabot alerts against deployed code paths and lockfiles. Update Next.js to a release containing the 16.3.6 fixes or later compatible release, and update/replace `python-jose` after reviewing both critical algorithm-confusion advisories. Apply compatible patched versions for the remaining alerts; do not suppress without documented non-applicability.
+2. Replace `buy-credits {price_id, credits}` with a server-owned `credit_pack_id`.
+3. Resolve provider price and credit quantity from an approved database/config record; never trust either value from the browser or webhook custom metadata alone.
+4. Add database uniqueness on provider event/reference IDs and transaction-safe idempotency.
+5. Replace OAuth token query parameters with one of:
    - secure HttpOnly/SameSite session cookies, or
    - an expiring single-use opaque exchange code stored server-side and redeemed by the frontend.
-5. Generate and validate OAuth `state`; add PKCE where supported; bind intended locale/destination to signed server state.
-6. Verify Google identity/email claims appropriate to the selected OAuth endpoint before account linking.
-7. Introduce refresh-session/token-family persistence, rotation, reuse detection and logout/password-reset revocation.
-8. Decide and enforce the email-verification gate consistently.
-9. Validate production startup: reject placeholder JWT secret, bootstrap password, missing active-provider secrets and unsafe debug mode.
-10. Redact provider/internal exception strings from public responses; log with correlation IDs.
+6. Generate and validate OAuth `state`; add PKCE where supported; bind intended locale/destination to signed server state.
+7. Verify Google identity/email claims appropriate to the selected OAuth endpoint before account linking.
+8. Introduce refresh-session/token-family persistence, rotation, reuse detection and logout/password-reset revocation.
+9. Decide and enforce the email-verification gate consistently.
+10. Validate production startup: reject placeholder JWT secret, bootstrap password, missing active-provider secrets and unsafe debug mode.
+11. Redact provider/internal exception strings from public responses; log with correlation IDs.
 
 ### Data-isolation changes
 
@@ -71,6 +73,7 @@ Enforce this rule in the service signature so callers must provide the current u
 
 ### Acceptance criteria
 
+- Dependabot has no unresolved critical/high alert unless the owner accepts a documented, time-bounded exception with evidence of non-applicability; auth and frontend E2E regressions pass after updates.
 - OAuth callback URLs contain no access/refresh token and invalid/replayed state is rejected.
 - Logout and password reset revoke relevant refresh sessions.
 - A cross-user same-subject RAG test proves no private chunk leakage.
