@@ -24,7 +24,7 @@ BACKUP_KEEP_DAYS="$(get_env BACKUP_KEEP_DAYS)"
 BACKUP_S3_BUCKET="$(get_env BACKUP_S3_BUCKET)"
 BACKUP_S3_ENDPOINT="$(get_env BACKUP_S3_ENDPOINT)"
 BACKUP_RCLONE_REMOTE="$(get_env BACKUP_RCLONE_REMOTE)"
-PROJECT="${COMPOSE_PROJECT_NAME:-saas-template}"
+PROJECT="${COMPOSE_PROJECT_NAME:-nuvira}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="${BACKUP_DIR:-/root/backups/${PROJECT}}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
@@ -36,7 +36,7 @@ echo "==> Backup ${PROJECT} @ ${STAMP}"
 
 # 1) Database dump (runs inside the db container — no host psql needed)
 echo "  - dumping database…"
-docker compose exec -T db pg_dump -U "${POSTGRES_USER:-saas}" "${POSTGRES_DB:-saas}" \
+docker compose exec -T db pg_dump --no-owner --no-acl -U "${POSTGRES_USER:-nuvira}" "${POSTGRES_DB:-nuvira}" \
   > "${WORK}/database.sql"
 
 # 2) .env (secrets + config)
@@ -49,6 +49,7 @@ docker compose cp backend:/app/uploads "${WORK}/uploads" 2>/dev/null || mkdir -p
 # pack
 tar -czf "$ARCHIVE" -C "$WORK" .
 rm -rf "$WORK"
+sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
 SIZE="$(du -h "$ARCHIVE" | cut -f1)"
 echo "  ✓ local backup: ${ARCHIVE} (${SIZE})"
 
@@ -70,5 +71,6 @@ fi
 
 # rotation: delete local backups older than KEEP_DAYS
 find "$BACKUP_DIR" -name "backup_${PROJECT}_*.tar.gz" -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
+find "$BACKUP_DIR" -name "backup_${PROJECT}_*.tar.gz.sha256" -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
 
 echo "✅ backup complete"

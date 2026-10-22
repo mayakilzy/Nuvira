@@ -1,40 +1,41 @@
-# FAHEM Integration Test Report
+# Nuvira Integration Test Report
 
 Date: 2026-10-22  
-Branch: `integration/suzanna-ui`
+Branch: `main`
 
 ## Automated checks
 
 | Check | Command | Result |
 |---|---|---|
-| Backend tests | `$env:DATABASE_URL='sqlite://'; python -m pytest -q` | PASS — 9 tests in 3.54s |
-| Authorization regression | included in pytest | PASS — enrolled student allowed; second student denied; cross-subject attempt denied |
-| Frontend production build/type check | `npm run build` | PASS — Next.js compiled, TypeScript completed, 14 routes generated |
-| Source safety scan | `rg` for SaaSForge URL, shared frontend image, removed endpoint and simulated timers | PASS for active student code |
+| Backend tests | `$env:DATABASE_URL='sqlite://'; python -m pytest -q` | **PASS** — 11 tests in 5.66s |
+| Nuvira identity and production CORS | `$env:DATABASE_URL='sqlite://'; python -m pytest -q tests/test_cors_branding.py` | **PASS** — 2 tests in 0.12s |
+| Frontend production build | `$env:NEXT_PUBLIC_API_URL='https://api.nuvira.agentcraft.info'; npm run build` | **PASS** — compiled, TypeScript completed, 14 static routes generated |
+| Independent TypeScript validation | `.\node_modules\.bin\tsc.cmd --noEmit` | **PASS** — no diagnostics |
+| Compose static parse/isolation assertions | PyYAML load and assertions | **PASS** — `name=nuvira`, five services, exact images, zero published ports, isolated DB network |
+| Backup/deployment script syntax | Git for Windows Bash `-n` | **PASS** |
+| Docker runtime | `docker compose config/build/up` | **BLOCKED** — Docker CLI is not installed on the review host |
 
-## Browser checks (isolated localhost)
+Pytest continues to emit a non-failing deprecation warning because `asyncio_default_fixture_loop_scope` is unset.
 
-Environment: FastAPI on `127.0.0.1:8995`, Next.js on `localhost:3000`, local SQLite database populated with synthetic course data only.
+## Preserved functional evidence
+
+The earlier isolated browser run remains relevant because the rebrand changed identity, paths, metadata, and deployment configuration without altering educational API behavior or database models:
 
 | Journey | Result |
 |---|---|
-| Email/password login and redirect to `/dashboard` | PASS |
-| Authenticated subject, chapter and concept loading | PASS |
-| Garden renders from persisted history | PASS |
-| SN2 mechanism renders three stored mechanism steps and official source note | PASS |
-| Mobile layout at 390×844 | PASS |
-| Arabic preference persistence and `html dir=rtl`, `lang=ar` | PASS |
-| Concurrent initial avatar session requests | PASS after race-condition repair; covered by regression test |
-| Desktop responsive branch | PASS by DOM/accessibility inspection; the in-app browser's enlarged-viewport screenshot surface was clipped, so no reliable desktop PNG is claimed. |
-| Real AI response | NOT RUN — no local OpenRouter key was supplied. |
-| File processing completion | NOT RUN — isolated worker/Redis and processing packages were unavailable. |
+| Email/password login and `/dashboard` redirect | PASS |
+| Authorized subject, chapter, concept, garden, and mechanism loading | PASS |
+| Cross-student and cross-subject isolation | PASS automated |
+| Mobile layout and Arabic RTL | PASS |
+| Real OpenRouter response | BLOCKED — credentials not supplied |
+| Celery/Redis document completion | BLOCKED — isolated Docker runtime unavailable |
+| Automated browser E2E suite | NOT RUN — no Playwright/Cypress suite exists |
 
-## Screenshots
+Existing screenshots are historical functional evidence and may contain the pre-rebrand companion label. They must not be treated as proof of the final Nuvira wordmark until new staging screenshots are captured.
 
-- `screenshots/garden-mobile.png`
-- `screenshots/mechanism-mobile.png`
-- `screenshots/settings-ar-rtl-mobile.png`
+## Source safety
 
-## Limitations
-
-Docker validation was not run. The closest feasible native validation was used. No production or shared infrastructure was contacted.
+- No database table, model, migration, or authentication token key was renamed.
+- No existing deployment was contacted.
+- No host ports are declared in Compose.
+- Only frontend/backend join the external proxy network; DB, Redis, and worker remain internal.

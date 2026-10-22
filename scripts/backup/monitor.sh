@@ -20,12 +20,13 @@ SSL_WARN_DAYS="${SSL_WARN_DAYS:-14}"
 PROBLEMS=()
 
 # 1) site responding?
-HEALTH_URL="http://localhost:${BACKEND_PORT:-8995}/health"
-curl -fsS --max-time 10 "$HEALTH_URL" >/dev/null 2>&1 \
-  || PROBLEMS+=("API not responding at ${HEALTH_URL}")
+HEALTH_URL="http://127.0.0.1:8000/health"
+docker compose exec -T backend python -c \
+  "import urllib.request; urllib.request.urlopen('${HEALTH_URL}', timeout=10)" >/dev/null 2>&1 \
+  || PROBLEMS+=("API is not responding inside the backend container")
 
 # 2) database responding?
-docker compose exec -T db pg_isready -U "${POSTGRES_USER:-saas}" >/dev/null 2>&1 \
+docker compose exec -T db pg_isready -U "${POSTGRES_USER:-nuvira}" -d "${POSTGRES_DB:-nuvira}" >/dev/null 2>&1 \
   || PROBLEMS+=("PostgreSQL is not ready")
 
 # 3) disk usage
@@ -47,7 +48,7 @@ fi
 [ ${#PROBLEMS[@]} -eq 0 ] && { echo "$(date '+%F %T') ✓ all checks passed"; exit 0; }
 
 # build alert
-BODY="<h2>⚠️ ${COMPOSE_PROJECT_NAME:-saas-template} alert</h2><ul>"
+BODY="<h2>⚠️ ${COMPOSE_PROJECT_NAME:-nuvira} alert</h2><ul>"
 for p in "${PROBLEMS[@]}"; do BODY="${BODY}<li>${p}</li>"; echo "ALERT: $p"; done
 BODY="${BODY}</ul><p>$(date)</p>"
 

@@ -1,30 +1,23 @@
-# API Reference
+# Nuvira API Reference
 
-Interactive docs are always live at `/docs` (Swagger) and `/openapi.json`.
+Interactive documentation is available from a running API at `/docs` and `/openapi.json`.
 
 ## Auth
-`POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` ·
-`GET /auth/me` · `GET /auth/verify-email/{token}` ·
-`POST /auth/forgot-password` · `POST /auth/reset-password` ·
-`GET /auth/google` · `GET /auth/google/callback`
 
-## Billing
-`GET /billing/plans` · `POST /billing/create-checkout-session` ·
-`POST /billing/buy-credits` · `POST /billing/create-portal-session` ·
-`POST /billing/webhook` · `GET /billing/subscription`
+`POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /auth/me` · `GET /auth/verify-email/{token}` · `POST /auth/forgot-password` · `POST /auth/reset-password` · `GET /auth/google` · `GET /auth/google/callback`
 
-## Credits
-`GET /credits/balance` · `GET /credits/history`
+## Educational API
 
-## User
-`GET /user/profile` · `PUT /user/profile` · `PUT /user/password` ·
-`DELETE /user/account`
+`GET /agent/subjects` · `POST /agent/chat` · `GET /agent/preferences` · `PUT /agent/preferences` · `POST /agent/session/start` · `POST /agent/attempt` · `GET /agent/fun-fact` · `GET /agent/review-queue` · `GET /agent/chapters` · `GET /agent/concepts` · `POST /agent/materials/upload` · `GET /agent/materials` · `GET /agent/history`
 
-## Admin (role: admin)
-`GET /admin/users` · `GET /admin/stats`
+Subject, chapter, concept, attempts, chat, and materials requests enforce authenticated access. Materials are restricted to the uploading student.
 
-## Agent (per project)
-`POST /agent/execute` · `GET /agent/history`
+## Platform
 
-## Health
-`GET /health` · `GET /health/db`
+- Billing: `/billing/*`
+- Credits: `/credits/*`
+- Profile/account: `/user/*`
+- Administration: `/admin/*` (admin role)
+- Health: `GET /health`, `GET /health/db`
+
+There is no real quiz-generation endpoint in the reviewed version.

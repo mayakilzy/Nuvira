@@ -1,5 +1,5 @@
-import FahemApp from "@/components/fahem/FahemApp";
+import NuviraApp from "@/components/nuvira/NuviraApp";
 
 export default function Dashboard() {
-  return <FahemApp />;
+  return <NuviraApp />;
 }

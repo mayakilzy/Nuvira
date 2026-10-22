@@ -1,10 +1,10 @@
 import "./globals.css";
-import "../components/fahem/fahem.css";
+import "../components/nuvira/nuvira.css";
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "FAHEM · Suzanna",
+  title: "Nuvira",
   description: "A calm, personal learning companion",
 };
 

@@ -34,7 +34,7 @@ export type Preferences = {
   avatar_corner_enabled: boolean;
 };
 
-export const fahemApi = {
+export const nuviraApi = {
   async subjects() {
     return (await api.get<{ subjects: Subject[] }>("/agent/subjects")).data.subjects;
   },

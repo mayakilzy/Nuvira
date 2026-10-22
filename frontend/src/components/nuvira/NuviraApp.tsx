@@ -10,8 +10,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { apiError } from "@/lib/api";
 import {
-  Chapter, Concept, fahemApi, Material, Preferences, Subject,
-} from "@/lib/fahem-api";
+  Chapter, Concept, nuviraApi, Material, Preferences, Subject,
+} from "@/lib/nuvira-api";
 import { Avatar } from "./Avatar";
 
 type Tab = "garden" | "chapters" | "materials" | "settings";
@@ -19,9 +19,9 @@ type Language = Preferences["ui_language"];
 type Message = { id: string; from: "user" | "companion"; text: string; grounded?: boolean };
 
 const COPY = {
-  de: { garden: "Garten", chapters: "Kapitel", materials: "Materialien", settings: "Einstellungen", chat: "Mit Suzanna reden", welcome: "Willkommen zurück", progress: "Dein Lernweg", due: "Heute zur Wiederholung", empty: "Für dein Konto ist noch kein Fach freigeschaltet.", choose: "Fach wählen", upload: "PDF oder PPT hochladen", noChapters: "Noch keine Kapitel verfügbar.", noMaterials: "Noch keine Materialien hochgeladen.", loading: "Wird geladen…", retry: "Erneut versuchen", account: "Konto", appearance: "Erscheinungsbild", language: "Sprache der Oberfläche", send: "Senden", prompt: "Frag Suzanna zu deinem Kurs…", source: "Mit deinem Kursmaterial verknüpft", understood: "Das sitzt", review: "Noch einmal ansehen" },
-  en: { garden: "Garden", chapters: "Chapters", materials: "Materials", settings: "Settings", chat: "Talk to Suzanna", welcome: "Welcome back", progress: "Your learning path", due: "Due for review", empty: "No subject has been assigned to your account yet.", choose: "Choose subject", upload: "Upload PDF or PPT", noChapters: "No chapters are available yet.", noMaterials: "No materials uploaded yet.", loading: "Loading…", retry: "Try again", account: "Account", appearance: "Appearance", language: "Interface language", send: "Send", prompt: "Ask Suzanna about your course…", source: "Linked to your course material", understood: "I understand it", review: "Review again" },
-  ar: { garden: "حديقتي", chapters: "الفصول", materials: "المواد", settings: "الإعدادات", chat: "تحدث مع سوزانا", welcome: "مرحبًا بعودتك", progress: "مسار تعلمك", due: "للمراجعة اليوم", empty: "لم تُضف مادة دراسية إلى حسابك بعد.", choose: "اختر المادة", upload: "ارفع PDF أو PPT", noChapters: "لا توجد فصول متاحة بعد.", noMaterials: "لم تُرفع مواد بعد.", loading: "جارٍ التحميل…", retry: "أعد المحاولة", account: "الحساب", appearance: "المظهر", language: "لغة الواجهة", send: "إرسال", prompt: "اسأل سوزانا عن مادتك…", source: "مرتبط بمواد مقررك", understood: "فهمت الفكرة", review: "أراجعها مرة أخرى" },
+  de: { garden: "Garten", chapters: "Kapitel", materials: "Materialien", settings: "Einstellungen", chat: "Mit Nuvira lernen", welcome: "Willkommen zurück", progress: "Dein Lernweg", due: "Heute zur Wiederholung", empty: "Für dein Konto ist noch kein Fach freigeschaltet.", choose: "Fach wählen", upload: "PDF oder PPT hochladen", noChapters: "Noch keine Kapitel verfügbar.", noMaterials: "Noch keine Materialien hochgeladen.", loading: "Wird geladen…", retry: "Erneut versuchen", account: "Konto", appearance: "Erscheinungsbild", language: "Sprache der Oberfläche", send: "Senden", prompt: "Frag Nuvira zu deinem Kurs…", source: "Mit deinem Kursmaterial verknüpft", understood: "Das sitzt", review: "Noch einmal ansehen" },
+  en: { garden: "Garden", chapters: "Chapters", materials: "Materials", settings: "Settings", chat: "Talk to Nuvira", welcome: "Welcome back", progress: "Your learning path", due: "Due for review", empty: "No subject has been assigned to your account yet.", choose: "Choose subject", upload: "Upload PDF or PPT", noChapters: "No chapters are available yet.", noMaterials: "No materials uploaded yet.", loading: "Loading…", retry: "Try again", account: "Account", appearance: "Appearance", language: "Interface language", send: "Send", prompt: "Ask Nuvira about your course…", source: "Linked to your course material", understood: "I understand it", review: "Review again" },
+  ar: { garden: "حديقتي", chapters: "الفصول", materials: "المواد", settings: "الإعدادات", chat: "تعلّم مع نوفيرا", welcome: "مرحبًا بعودتك", progress: "مسار تعلمك", due: "للمراجعة اليوم", empty: "لم تُضف مادة دراسية إلى حسابك بعد.", choose: "اختر المادة", upload: "ارفع PDF أو PPT", noChapters: "لا توجد فصول متاحة بعد.", noMaterials: "لم تُرفع مواد بعد.", loading: "جارٍ التحميل…", retry: "أعد المحاولة", account: "الحساب", appearance: "المظهر", language: "لغة الواجهة", send: "إرسال", prompt: "اسأل نوفيرا عن مادتك…", source: "مرتبط بمواد مقررك", understood: "فهمت الفكرة", review: "أراجعها مرة أخرى" },
 } as const;
 
 const NAV: { key: Tab; icon: typeof Home }[] = [
@@ -66,7 +66,7 @@ function mechanismSteps(mechanism: unknown): string[] {
   return [typeof mechanism === "string" ? mechanism : JSON.stringify(mechanism)];
 }
 
-export default function FahemApp() {
+export default function NuviraApp() {
   const { user, logout } = useAuth();
   const [tab, setTab] = useState<Tab>("garden");
   const [language, setLanguage] = useState<Language>("de");
@@ -95,14 +95,14 @@ export default function FahemApp() {
     try {
       setError("");
       const [chapterData, conceptData, materialData, historyData, reviewData] = await Promise.all([
-        fahemApi.chapters(id), fahemApi.concepts(id), fahemApi.materials(id), fahemApi.history(id), fahemApi.reviewQueue(id),
+        nuviraApi.chapters(id), nuviraApi.concepts(id), nuviraApi.materials(id), nuviraApi.history(id), nuviraApi.reviewQueue(id),
       ]);
       setChapters(chapterData); setConcepts(conceptData.concepts); setMaterials(materialData); setHistory(historyData); setDue(reviewData);
     } catch (reason) { setError(apiError(reason)); }
   }, []);
 
   useEffect(() => {
-    Promise.all([fahemApi.subjects(), fahemApi.preferences(), fahemApi.startSession(crypto.randomUUID())])
+    Promise.all([nuviraApi.subjects(), nuviraApi.preferences(), nuviraApi.startSession(crypto.randomUUID())])
       .then(([subjectData, prefs, avatarData]) => {
         setSubjects(subjectData); setLanguage(prefs.ui_language); setTheme(prefs.theme); setAvatar(avatarData);
         if (subjectData[0]) { setSubjectId(subjectData[0].id); void loadSubject(subjectData[0].id); }
@@ -115,7 +115,7 @@ export default function FahemApp() {
     const hasProcessing = materials.some((item) => item.status === "processing");
     if (!hasProcessing || !subjectId) return;
     const timer = window.setInterval(() => {
-      fahemApi.materials(subjectId).then(setMaterials).catch(() => undefined);
+      nuviraApi.materials(subjectId).then(setMaterials).catch(() => undefined);
     }, 3000);
     return () => window.clearInterval(timer);
   }, [materials, subjectId]);
@@ -135,7 +135,7 @@ export default function FahemApp() {
 
   async function updatePreferences(patch: Partial<Preferences>) {
     try {
-      const saved = await fahemApi.savePreferences(patch);
+      const saved = await nuviraApi.savePreferences(patch);
       setLanguage(saved.ui_language); setTheme(saved.theme);
     } catch (reason) { setError(apiError(reason)); }
   }
@@ -143,8 +143,8 @@ export default function FahemApp() {
   async function uploadFile(file?: File) {
     if (!file || !subjectId) return;
     try {
-      setError(""); await fahemApi.upload(subjectId, chapterId, file);
-      setMaterials(await fahemApi.materials(subjectId));
+      setError(""); await nuviraApi.upload(subjectId, chapterId, file);
+      setMaterials(await nuviraApi.materials(subjectId));
     } catch (reason) { setError(apiError(reason)); }
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -155,7 +155,7 @@ export default function FahemApp() {
     const userMessage: Message = { id: crypto.randomUUID(), from: "user", text };
     setMessages((current) => [...current, userMessage]); setChatText(""); setChatBusy(true);
     try {
-      const response = await fahemApi.chat(text, subjectId, chapterId);
+      const response = await nuviraApi.chat(text, subjectId, chapterId);
       setMessages((current) => [...current, { id: crypto.randomUUID(), from: "companion", text: response.reply, grounded: response.used_material_context }]);
     } catch (reason) {
       setMessages((current) => [...current, { id: crypto.randomUUID(), from: "companion", text: apiError(reason) }]);
@@ -164,28 +164,28 @@ export default function FahemApp() {
 
   async function record(conceptId: number, understood: boolean) {
     try {
-      const response = await fahemApi.recordAttempt(conceptId, understood);
+      const response = await nuviraApi.recordAttempt(conceptId, understood);
       if (subjectId) await loadSubject(subjectId);
       if (response.companion_message) setMessages((current) => [...current, { id: crypto.randomUUID(), from: "companion", text: response.companion_message! }]);
     } catch (reason) { setError(apiError(reason)); }
   }
 
-  if (busy) return <div className="fahem-loading"><Avatar expression="thinking" size={72}/><span>{t.loading}</span></div>;
+  if (busy) return <div className="nuvira-loading"><Avatar expression="thinking" size={72}/><span>{t.loading}</span></div>;
 
   return (
-    <div className="fahem-app" dir={rtl ? "rtl" : "ltr"}>
-      <aside className="fahem-sidebar">
-        <div className="fahem-brand"><Avatar color={avatar.color} shape={avatar.shape} size={42}/><div><strong>Suzanna</strong><small>Lernbegleiterin</small></div></div>
+    <div className="nuvira-app" dir={rtl ? "rtl" : "ltr"}>
+      <aside className="nuvira-sidebar">
+        <div className="nuvira-brand"><Avatar color={avatar.color} shape={avatar.shape} size={42}/><div><strong>Nuvira</strong><small>Lernbegleiterin</small></div></div>
         <nav>{NAV.map(({ key, icon: Icon }) => <button key={key} className={tab === key ? "active" : ""} onClick={() => { setTab(key); setChatOpen(false); }}><Icon size={19}/><span>{t[key]}</span></button>)}</nav>
         <button className="talk-button" onClick={() => setChatOpen(true)}><Avatar color={avatar.color} shape={avatar.shape} size={31}/><span>{t.chat}</span><MessageCircle size={15}/></button>
-        <small className="version">FAHEM · Suzanna v1.0</small>
+        <small className="version">Nuvira v1.0</small>
       </aside>
 
-      <main className="fahem-main">
-        {error && <div className="fahem-error"><CircleAlert size={16}/><span>{error}</span><button onClick={() => setError("")}><X size={15}/></button></div>}
+      <main className="nuvira-main">
+        {error && <div className="nuvira-error"><CircleAlert size={16}/><span>{error}</span><button onClick={() => setError("")}><X size={15}/></button></div>}
         {!subjects.length ? <section className="empty-state"><Avatar expression="thinking" size={92}/><h1>{t.empty}</h1><p>Ask an administrator to grant access to a subject package.</p></section> : chatOpen ? (
           <section className="chat-panel">
-            <header><Avatar color={avatar.color} shape={avatar.shape} size={44}/><div><strong>Suzanna</strong><small>{t.chat}</small></div><button onClick={() => setChatOpen(false)}><X size={18}/></button></header>
+            <header><Avatar color={avatar.color} shape={avatar.shape} size={44}/><div><strong>Nuvira</strong><small>{t.chat}</small></div><button onClick={() => setChatOpen(false)}><X size={18}/></button></header>
             <div className="messages">
               {!messages.length && <div className="chat-welcome"><Avatar color={avatar.color} shape={avatar.shape} expression="smiling" size={76}/><p>{t.prompt}</p></div>}
               {messages.map((message) => <div key={message.id} className={`message ${message.from}`}><p>{message.text}</p>{message.grounded && <small><BookOpen size={11}/>{t.source}</small>}</div>)}

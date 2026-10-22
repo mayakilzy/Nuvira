@@ -1,45 +1,29 @@
-# Restore Guide
+# Nuvira Restore Guide
 
-Bring your platform back from any backup — on the same server or a brand-new
-one — with a single command. From a fresh machine to fully running takes
-minutes.
+Use this procedure only for a Nuvira backup. For transferring legacy application data into Nuvira, use `SUZANNA_TO_NUVIRA_MIGRATION.md` instead of restoring a legacy `.env` wholesale.
 
-## What you need
+## Requirements
 
-- A backup file (e.g. `backup_saas-template_20260615_030000.tar.gz`).
-- A server with Docker installed.
-- This project folder.
+- Nuvira source checked out at the reviewed commit in `/root/apps/nuvira/`.
+- Docker Engine and Compose.
+- The configured external proxy network.
+- A trusted `backup_nuvira_<timestamp>.tar.gz` and its `.sha256` sidecar.
+- Empty or intentionally replaceable Nuvira named volumes.
 
-## Restore in one command
-
-```bash
-./scripts/backup/restore.sh /path/to/backup_xxx.tar.gz
-```
-
-It automatically:
-
-1. Restores your `.env` (keys and settings).
-2. Starts the database.
-3. Loads all your data back into it.
-4. Restores uploaded files.
-5. Brings the whole platform online.
-
-## Confirm it worked
+## Restore
 
 ```bash
-curl http://localhost:8995/health/db
+cd /root/apps/nuvira
+sha256sum -c /path/to/backup_nuvira_<timestamp>.tar.gz.sha256
+./scripts/backup/restore.sh /path/to/backup_nuvira_<timestamp>.tar.gz
+docker compose exec -T backend alembic upgrade head
 ```
 
-You should see `{"database": "ok"}`, and your site loads with all accounts and
-data intact.
+## Verify internally
 
-## Moving to a new server
+```bash
+docker compose exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health/db').read().decode())"
+docker compose ps
+```
 
-This is the same as a restore — Docker makes it identical everywhere:
-
-1. On the old server: `./scripts/backup/backup.sh`
-2. Copy the backup file to the new server.
-3. On the new server: `./scripts/backup/restore.sh backup_xxx.tar.gz`
-4. Point your domain at the new server's IP.
-
-Typical time: 20–30 minutes, most of it the file copy.
+Then verify login, subject access, learning history, uploaded-file availability, chat, and worker processing through the production domains. Do not delete the source backup or pre-restore volumes until business-level counts and sampled accounts pass verification.

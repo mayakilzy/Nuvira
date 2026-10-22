@@ -1,45 +1,46 @@
-# FAHEM · Suzanna
+# Nuvira
 
-FAHEM is a multilingual learning companion that turns an authenticated student's enrolled courses, chapters and uploaded materials into a calm, personal study experience. Suzanna explains concepts in the course's teaching language, grounds answers in processed materials when available, and quietly uses learning attempts to schedule review without punitive grades or fabricated progress.
+Nuvira is a multilingual learning companion that turns an authenticated student's enrolled subjects, chapters, concepts, and uploaded materials into a calm, personal study experience. It explains course concepts, plays stored mechanisms, grounds AI answers in authorized materials when available, and schedules review from persisted learning attempts without fabricating progress.
+
+- Repository: `https://github.com/mayakilzy/Nuvira.git`
+- Frontend: `https://nuvira.agentcraft.info`
+- API: `https://api.nuvira.agentcraft.info`
+- Planned server directory: `/root/apps/nuvira/`
 
 ## Core journeys
 
-- A student signs in and enters a garden that grows from persisted learning attempts.
-- A student browses enrolled subjects, chapters and concepts, then plays stored mechanism steps.
-- A student asks Suzanna a course-scoped question using authenticated retrieval and OpenRouter.
-- A student uploads PDF/PPT material, assigns it to a chapter and observes real worker status.
-- A student switches the interface among German, English and Arabic with RTL support.
+- Sign in and view a garden driven by persisted learning attempts.
+- Browse authorized subjects, chapters, concepts, and mechanism steps.
+- Ask the Nuvira companion a course-scoped question through OpenRouter.
+- Upload PDF/PPT material, assign it to a chapter, and observe real Celery status.
+- Switch the interface among German, English, and Arabic with RTL support.
 
 ## Architecture
 
 ```text
-Next.js student UI
-  ├─ existing JWT auth + refresh
-  ├─ typed educational API client
-  └─ garden / chapters / chat / materials / preferences
-                    │
-                    ▼
-FastAPI authorization boundary
-  ├─ UserSubjectAccess enforcement
-  ├─ study log + spaced review
-  ├─ material status + Celery dispatch
-  └─ scoped retrieval + OpenRouter
-                    │
-          ┌─────────┴─────────┐
-          ▼                   ▼
- PostgreSQL + pgvector     Redis + Celery
+Browser
+  ├─ https://nuvira.agentcraft.info ───────▶ frontend:3000
+  └─ https://api.nuvira.agentcraft.info ───▶ backend:8000
+                         Nginx Proxy Manager / shared proxy network
+                                             │
+                 ┌───────────────────────────┴───────────────────────────┐
+                 │                    Nuvira stack                       │
+                 │ frontend + backend ── project-internal network       │
+                 │                    ├─ PostgreSQL + pgvector           │
+                 │                    └─ Redis ── Celery worker          │
+                 └───────────────────────────────────────────────────────┘
 ```
 
-The SaaS foundation remains intact: accounts, JWT/Google authentication, billing, credits, admin, email, audit logs, backups and provider-independent payments.
+No application or database port is published on the host. Nginx Proxy Manager reaches only `frontend:3000` and `backend:8000` through the explicitly configured external proxy network. PostgreSQL and Redis remain on the Nuvira-only internal network.
 
 ## Technology
 
-- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS
+- Frontend: Next.js 16 App Router, React 19, TypeScript, Tailwind CSS
 - Backend: FastAPI, SQLAlchemy, Pydantic
-- Data: PostgreSQL 16, pgvector; SQLite fallback for local tests
+- Data: PostgreSQL 16 and pgvector; SQLite for isolated tests
 - Processing: Redis, Celery, pypdf, python-pptx
 - AI: OpenRouter for chat and a separate embeddings provider
-- Infrastructure: isolated Docker Compose stack, Nginx-compatible routing, backup/restore scripts
+- Platform: JWT/Google authentication, billing, credits, admin, email, audit logs
 
 ## Local development
 
@@ -50,6 +51,7 @@ python -m venv .venv
 pip install -r requirements.txt -r requirements-dev.txt
 $env:DATABASE_URL="sqlite:///./dev.db"
 $env:JWT_SECRET="local-only-secret"
+$env:FRONTEND_URL="http://localhost:3000"
 python -m uvicorn app.main:app --reload --port 8995
 
 cd ..\frontend
@@ -57,6 +59,17 @@ npm install
 $env:NEXT_PUBLIC_API_URL="http://127.0.0.1:8995"
 npm run dev
 ```
+
+## Production preparation
+
+1. Create the external proxy network once during deployment: `docker network create hermes-network`.
+2. Clone the repository to `/root/apps/nuvira/`.
+3. Copy `.env.example` to `.env`, replace every placeholder, and keep `PROXY_NETWORK` aligned with Nginx Proxy Manager.
+4. Build with the production API URL: `docker compose build --build-arg NEXT_PUBLIC_API_URL=https://api.nuvira.agentcraft.info frontend`.
+5. Start the isolated stack: `docker compose up -d`.
+6. Configure Nginx Proxy Manager to route the frontend domain to `frontend:3000` and API domain to `backend:8000` on the shared network.
+
+Do not reuse or attach existing deployment volumes. If legacy data is intentionally migrated, follow [`docs/SUZANNA_TO_NUVIRA_MIGRATION.md`](docs/SUZANNA_TO_NUVIRA_MIGRATION.md) and obtain an independently verified backup first.
 
 ## Verification
 
@@ -67,7 +80,10 @@ python -m pytest -q
 
 cd ..\frontend
 npm run build
+.\node_modules\.bin\tsc.cmd --noEmit
 ```
+
+Docker runtime validation requires Docker and a pre-created proxy network. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## API surface
 
@@ -78,18 +94,13 @@ npm run build
 | Companion | `/agent/session/start`, `/agent/chat`, `/agent/fun-fact` |
 | Materials | `/agent/materials`, `/agent/materials/upload` |
 | Preferences | `/agent/preferences` |
-| SaaS services | `/billing/*`, `/credits/*`, `/user/*`, `/admin/*` |
+| Platform | `/billing/*`, `/credits/*`, `/user/*`, `/admin/*` |
 
-## Business model
+## Known release blockers
 
-The existing billing and credit ledger can support course access, subscriptions and metered AI usage. `UserSubjectAccess` is the server-side entitlement boundary for purchased, gifted or trial subjects.
+- Real OpenRouter and embedding calls require staging-only credentials.
+- Redis/Celery document processing has not completed an isolated Docker rehearsal.
+- A persistent quiz bank and real quiz-generation API do not yet exist.
+- Production environment, backup/restore, proxy routing, and OAuth flows require staging verification.
 
-## Roadmap
-
-- Add an additive chapter-to-concept association and migration.
-- Add a persistent authorized quiz bank and attempt sessions.
-- Replace OAuth query tokens with a one-time exchange code.
-- Verify AI retrieval and document processing in isolated staging.
-- Reconcile archive, remote and deployed SHAs before an owner-approved rollout.
-
-See [`docs/integration/05_FINAL_HANDOFF.md`](docs/integration/05_FINAL_HANDOFF.md) for the implementation handoff and acceptance status.
+See [`docs/integration/05_FINAL_HANDOFF.md`](docs/integration/05_FINAL_HANDOFF.md) for the current engineering handoff.

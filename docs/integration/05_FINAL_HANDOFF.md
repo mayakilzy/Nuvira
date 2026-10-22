@@ -1,34 +1,45 @@
-# FAHEM Final Handoff
+# Nuvira Final Engineering Handoff
 
 ## Outcome
 
-The authenticated `/dashboard` is now the FAHEM/Suzanna educational experience rather than the SaaS Template overview. It preserves the approved calm visual language, garden, companion avatar, responsive navigation, DE/EN/AR preferences and RTL.
+The integrated educational application is branded as **Nuvira** across visible UI, Next.js metadata, backend identity, package metadata, documentation, environment examples, backup tooling, Compose identity, network/volume names, and Docker images.
 
-Real authenticated API bindings are implemented for enrolled subjects, chapters, concepts/mechanisms, study attempts, review queue, progress history, companion chat, materials and preferences. Server-side subject authorization closes the original cross-student/cross-subject exposure.
+Educational functionality, authentication contracts, database models, table names, and migrations remain unchanged. The Nuvira API retains server-side subject authorization and uploader-scoped materials.
 
-## Commits
+## Deployment preparation
 
-- `6a61cae` — imported archive baseline
-- `6d746d8` — secured educational API contracts and FAHEM image identity
-- `362131a` — integrated Suzanna student interface into Next.js
-- Documentation commit: see branch tip
+- Compose project: `nuvira`
+- Services: frontend, backend, worker, Redis, PostgreSQL
+- Images: `localdev/nuvira-frontend:1.0.0`, `localdev/nuvira-backend:1.0.0`
+- Internal ports: frontend 3000, backend 8000
+- Host port mappings: none
+- Proxy integration: explicit external network shared only by frontend/backend
+- Production frontend origin is covered by a FastAPI CORS regression test
+- `NEXT_PUBLIC_API_URL` is injected during the frontend Docker build
 
-## Changed areas
+## Verification
 
-- `backend/app/routers/agent.py`: authorized educational endpoints and real history/concept/subject contracts.
-- `backend/tests/test_agent_access.py`: two-student access regression coverage.
-- `backend/tests/test_companion_session.py`: concurrent avatar-session regression coverage.
-- `frontend/src/components/fahem/`: educational UI, avatar, icons and responsive styles.
-- `frontend/src/lib/fahem-api.ts`: typed authenticated bindings.
-- `/dashboard` and `/workspace`: FAHEM home and safe redirect.
-- Compose/environment: FAHEM-specific backend/frontend images and production URL examples.
+- Backend tests: **PASS — 11/11**
+- Nuvira identity/CORS tests: **PASS — 2/2**
+- Frontend production build: **PASS**
+- TypeScript: **PASS**
+- Compose static isolation review: **PASS**
+- Shell syntax for deployment/backup scripts: **PASS**
+- Docker runtime: **BLOCKED** on the review host
 
-## Acceptance status
+## Data migration
 
-- Authenticated student reaches FAHEM UI: PASS locally.
-- Real authorized course data: PASS locally.
-- Responsive, multilingual and RTL: PASS locally.
-- Unauthorized subject access blocked: PASS automated.
-- Production API address/image identity configured: PASS in source; production artifact not built.
-- Real chat/material processing in isolated staging: BLOCKED pending service credentials/worker environment.
-- Production rollout: NOT PERFORMED; requires owner approval.
+`docs/SUZANNA_TO_NUVIRA_MIGRATION.md` defines a separate, checksum-verified procedure for accounts, entitlements, progress, document metadata/embeddings, and uploaded files. It intentionally does not copy the legacy `.env`, Redis state, networks, or volumes. The procedure was not executed.
+
+## Remaining blockers
+
+- GitHub authentication must be valid before pushing.
+- Docker build/runtime, shared proxy networking, migrations, and backup/restore require isolated staging.
+- Real OpenRouter/embedding and Redis/Celery flows remain unverified.
+- Real quiz generation is not implemented.
+- New final-brand screenshots and automated browser E2E are still needed.
+- OAuth query-string tokens remain a security follow-up.
+
+## Readiness
+
+The source is ready for GitHub publication and isolated staging after final commit review. It is not ready for production deployment.

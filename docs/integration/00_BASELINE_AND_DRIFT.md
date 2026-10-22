@@ -1,6 +1,6 @@
-# FAHEM Integration Baseline and Drift
+# Nuvira Integration Baseline and Drift
 
-## Inputs inspected
+## Legacy inputs inspected
 
 - `fahem-main.zip`: FastAPI backend, Next.js App Router frontend, PostgreSQL/pgvector models, Redis/Celery worker, authentication, billing, credits, admin, Docker Compose, backup scripts.
 - `suzanna.zip`: React/Vite visual prototype centered in `src/app/App.tsx`, plus local UI primitives and design tokens.

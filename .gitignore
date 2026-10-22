@@ -8,6 +8,5 @@ node_modules/
 .pytest_cache/
 .ruff_cache/
 *.tsbuildinfo
-# local backup of the original deployment (contains a real .env — never commit)
-/suzanna.zip
-.env
+# local source/deployment archives may contain real environments; never commit
+/*.zip

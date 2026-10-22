@@ -4,7 +4,7 @@ export default function Landing() {
   return (
     <main>
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 28px", maxWidth: 1080, margin: "0 auto" }}>
-        <div style={{ fontWeight: 700, letterSpacing: "-.02em" }}>FAHEM · Suzanna</div>
+        <div style={{ fontWeight: 700, letterSpacing: "-.02em" }}>Nuvira</div>
         <div style={{ display: "flex", gap: 10 }}>
           <Link className="btn btn-ghost" href="/pricing">Pricing</Link>
           <Link className="btn btn-ghost" href="/login">Sign in</Link>
@@ -28,7 +28,7 @@ export default function Landing() {
         {[
           ["Dein Kurs", "Kapitel und Konzepte aus deinem freigeschalteten Fach."],
           ["Deine Materialien", "PDF- und PowerPoint-Unterlagen sicher verarbeiten lassen."],
-          ["Deine Begleiterin", "Suzanna beantwortet Fragen im Kontext deiner Lernunterlagen."],
+          ["Deine Begleiterin", "Nuvira beantwortet Fragen im Kontext deiner Lernunterlagen."],
         ].map(([t, d]) => (
           <div key={t} className="card card-pad">
             <h3 style={{ fontSize: 16, marginBottom: 8 }}>{t}</h3>

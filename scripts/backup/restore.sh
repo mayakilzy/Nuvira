@@ -11,6 +11,12 @@ set -euo pipefail
 ARCHIVE="${1:?Usage: restore.sh <backup_archive.tar.gz>}"
 [ -f "$ARCHIVE" ] || { echo "Archive not found: $ARCHIVE"; exit 1; }
 
+if [ -f "${ARCHIVE}.sha256" ]; then
+  sha256sum -c "${ARCHIVE}.sha256"
+else
+  echo "  ! checksum sidecar not found; verify archive provenance before continuing"
+fi
+
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 WORK="$(mktemp -d)"
@@ -37,7 +43,7 @@ done
 # 3) restore the database dump
 if [ -f "${WORK}/database.sql" ]; then
   echo "  - restoring database…"
-  docker compose exec -T db psql -U "${POSTGRES_USER:-saas}" -d "${POSTGRES_DB:-saas}" \
+  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-nuvira}" -d "${POSTGRES_DB:-nuvira}" \
     < "${WORK}/database.sql"
   echo "  ✓ database restored"
 fi
@@ -52,4 +58,4 @@ fi
 
 rm -rf "$WORK"
 echo "✅ restore complete — platform is back online"
-echo "   Verify:  curl http://localhost:${BACKEND_PORT:-8995}/health/db"
+echo "   Verify: docker compose exec -T backend python -c \"import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health/db').read().decode())\""

@@ -11,11 +11,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- App ---
-    APP_NAME: str = "FAHEM"
+    APP_NAME: str = "Nuvira"
     ENV: str = "development"          # development | production
     DEBUG: bool = True
     API_PREFIX: str = ""              # e.g. "/api" if you want everything namespaced
-    FRONTEND_URL: str = "http://localhost:3008"
+    FRONTEND_URL: str = "https://nuvira.agentcraft.info"
     EXTRA_CORS_ORIGINS: str = ""
     RATE_LIMIT_PER_MINUTE: int = 120  # per IP; 0 disables
     EMBEDDING_DIM: int = 1536  # vector size (match your embedding model)

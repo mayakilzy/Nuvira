@@ -1,45 +1,33 @@
-# Handover Guide
+# Nuvira Handover Guide
 
-Everything you need to own and run your platform — written for a non-technical
-owner. Keep this file.
+Nuvira is a self-contained educational platform with user accounts, subject entitlements, learning progress, uploaded course materials, AI chat, billing, credits, and administration.
 
-## 1. What you received
+## First-time setup
 
-A complete, self-contained web platform: user accounts, payments, a credit
-system, an admin panel, and an AI feature — all running in Docker.
+1. Clone `https://github.com/mayakilzy/Nuvira.git` into `/root/apps/nuvira/`.
+2. Ensure the Nginx Proxy Manager network exists, then copy `.env.example` to `.env`.
+3. Replace all database, JWT, admin, AI, email, OAuth, and payment placeholders.
+4. Build the frontend with `PUBLIC_API_URL=https://api.nuvira.agentcraft.info`.
+5. Start with `docker compose up -d`; do not add host port mappings.
+6. Route `nuvira.agentcraft.info` to `frontend:3000` and `api.nuvira.agentcraft.info` to `backend:8000` through the shared proxy network.
+7. Run database migrations and the smoke tests in `docs/DEPLOYMENT.md`.
+8. Enable backups only after a successful backup/restore rehearsal.
 
-## 2. First-time setup (5 steps)
+## Isolation rules
 
-1. Copy `.env.example` to `.env` and fill in your keys (payments, email, AI).
-2. Set a strong `POSTGRES_PASSWORD`, `JWT_SECRET`, and `FIRST_ADMIN_PASSWORD`.
-3. Run `docker compose pull && docker compose up -d`.
-4. Point your domain at the server (frontend + API subdomain).
-5. Turn on backups: `./scripts/backup/install-cron.sh`.
+- Never attach Nuvira to another application's PostgreSQL, Redis, uploads, or internal network.
+- Only frontend and backend join the shared proxy network.
+- PostgreSQL, Redis, worker, and named volumes belong exclusively to Nuvira.
+- Never copy a legacy `.env` wholesale; create new production secrets and migrate only reviewed data.
 
-You can now sign in with the admin email/password from your `.env`.
+## Backups and migration
 
-## 3. Day-to-day
+- Daily backup: `./scripts/backup/backup.sh`
+- Restore guide: `docs/RESTORE_GUIDE.md`
+- Legacy data transfer: `docs/SUZANNA_TO_NUVIRA_MIGRATION.md`
 
-- **Admin panel** — manage users and see stats.
-- **Plans & pricing** — edit in the seed file (or have your developer expose it
-  in the admin panel).
-- **Money** — handled by your payment provider's own dashboard (Lemon Squeezy,
-  Paddle, or Stripe). The platform records every credit grant and charge.
+The migration is a separately authorized operation. It was documented but not executed during engineering preparation.
 
-## 4. Safety (already built in)
+## Safety
 
-- Automatic daily backups to up to three locations.
-- One-command restore on any server (see RESTORE_GUIDE.md).
-- Monitoring that emails you if the site, database, disk, or SSL has a problem.
-- The database is never exposed to the internet; every admin action is logged.
-
-## 5. If something breaks
-
-1. Don't panic — your data is backed up.
-2. Restore with: `./scripts/backup/restore.sh <latest backup file>`.
-3. Verify with: `curl https://<your-api-domain>/health/db`.
-
-## 6. Keys you must keep safe
-
-Your `.env` file contains every secret. Keep a copy somewhere safe and private.
-The nightly backup includes it automatically.
+Keep `.env`, database dumps, uploaded files, and backup archives outside Git. Before any upgrade, record the deployed commit and image digests, create a verified backup, and confirm rollback steps without deleting named volumes.

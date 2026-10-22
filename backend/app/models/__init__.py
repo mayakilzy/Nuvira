@@ -5,7 +5,7 @@ from app.models.plans import Plan
 from app.models.audit_log import AuditLog
 from app.models.embedding import Embedding
 
-# ── Suzanna App — جداول المحتوى والتفاعل ──────────────────
+# ── Nuvira App — جداول المحتوى والتفاعل ──────────────────
 from app.models.subject import SubjectPackage, UserSubjectAccess, Concept, FunFact
 from app.models.study import StudyLog, FunFactShownLog, AvatarState, PhraseUsage
 from app.models.content import Chapter, UploadedDocument
