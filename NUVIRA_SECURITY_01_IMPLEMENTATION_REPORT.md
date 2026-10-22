@@ -87,6 +87,7 @@ It is **not** a complete fresh-install baseline. Running `alembic upgrade head` 
 - `cd backend && python -m compileall -q app tests alembic` — **PASS**, no output.
 - `cd backend && python -m pip_audit -r requirements.txt --no-deps --disable-pip --progress-spinner off` — **PASS**, `No known vulnerabilities found`; direct pinned manifest only, not a fully hashed transitive lock.
 - `cd frontend && npm audit --json` — **PASS**, 0 vulnerabilities across 135 reported dependencies.
+- GitHub's push response still reports **54 Dependabot alerts on the unchanged default branch**: 5 critical, 26 high, 19 moderate, and 4 low. This branch has not been merged, so those default-branch counts are not evidence against or confirmation of the remediated dependency graph. Owner review must inspect alert applicability again after an approved merge.
 - `cd frontend && npx tsc --noEmit` — **PASS**, no output.
 - `cd frontend && NEXT_PUBLIC_API_URL=https://api.nuvira.agentcraft.info npm run build` — **PASS**, Next.js 16.3.8, 14 static pages generated.
 - `git diff --check` — **PASS**; Git reported only Windows LF-to-CRLF conversion notices.

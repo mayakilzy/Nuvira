@@ -54,6 +54,7 @@
 ### Dependency reproducibility is incomplete
 
 - `pip-audit` reports no known issue in direct pinned requirements, but the backend does not have a fully resolved, hash-locked transitive requirements file. `pip check` on the host reported conflicts from unrelated globally installed packages, so it is not valid deployment evidence.
+- GitHub still reports 54 alerts (5 critical, 26 high, 19 moderate, 4 low) on the unchanged default branch. SECURITY-01 is an unmerged review branch; alert closure and applicability cannot be claimed from that default-branch count.
 - Next action: build in a clean virtual environment/container, generate a hash-locked transitive set, run `pip check` and `pip-audit` there, and add CI/SBOM scanning.
 
 ### Browser E2E and responsive/security headers were not exercised
