@@ -16,11 +16,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl \
     && useradd -m appuser
 COPY --from=builder /install /usr/local
 COPY . .
-# Writable uploads dir owned by the non-root runtime user (backend + worker
-# share the named volume). On first mount Docker copies the image dir's
-# ownership/permissions onto the volume — so it must exist and be owned by
-# appuser. 770 (not 777): no other user in the container may write student files.
-RUN mkdir -p /app/uploads && chown appuser:appuser /app/uploads && chmod 770 /app/uploads
+# Writable private-content directories owned by the non-root runtime user
+# (backend + worker share their named volumes). On first mount Docker copies
+# each image directory's ownership/permissions onto the volume, so both must
+# exist and be owned by appuser. 770 (not 777) prevents unrelated users in the
+# container from writing student files or curriculum source documents.
+RUN mkdir -p /app/uploads /app/curriculum-content \
+    && chown appuser:appuser /app/uploads /app/curriculum-content \
+    && chmod 770 /app/uploads /app/curriculum-content
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
