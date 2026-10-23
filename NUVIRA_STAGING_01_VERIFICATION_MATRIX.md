@@ -70,4 +70,3 @@ Status vocabulary: **PASS**, **FAIL**, **EXPECTED FAIL**, **NOT RUN**, **BLOCKED
 - Browser: six accepted outcomes across two projects; four normal passes and two explicit expected failures.
 - Mandatory infrastructure gates: all passed.
 - Production-product gates: remain blocked by the risks in `NUVIRA_STAGING_01_OPEN_RISKS.md`.
-

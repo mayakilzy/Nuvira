@@ -61,4 +61,3 @@ For production, rollback must use pre-change database and upload backups, immuta
 ## Final recommendation
 
 Proceed to a separately authorized isolated staging environment after dependency triage. Do not deploy to production and do not merge automatically. The infrastructure foundation is verified; the remaining risks are product, supply-chain, provider, proxy, and production-data gates rather than missing proof that the five-service secured foundation can run.
-

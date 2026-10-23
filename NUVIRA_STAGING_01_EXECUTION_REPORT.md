@@ -93,4 +93,3 @@ The artifact contains no `.env`, generated passwords, JWT secrets, database dump
 - Production deployment performed: **no**.
 - Live OpenRouter, OAuth, email, or payment provider used: **no**.
 - Real student content used: **no**.
-

@@ -149,4 +149,3 @@ The private backup files were not uploaded. The database was restored into `nuvi
 ## Cleanup evidence
 
 The workflow ended with scoped `docker compose ... down --remove-orphans`. It did not use `down -v`, `docker system prune`, a production Compose file, or a shared host. The GitHub runner was disposable.
-

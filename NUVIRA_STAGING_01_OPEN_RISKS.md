@@ -86,4 +86,3 @@ GitHub warned that actions using Node.js 20 were being forced to Node.js 24. Upd
 ### Windows line-ending notices
 
 The Windows checkout reports LF-to-CRLF conversion notices. `git diff --check` passes. Standardize with `.gitattributes` in a separate maintenance change if desired.
-
