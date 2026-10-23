@@ -9,12 +9,13 @@ from urllib.parse import urlparse
 
 FORBIDDEN = (
     "nuvira.agentcraft.info", "api.nuvira.agentcraft.info", "hermes-network",
-    "nuvira_postgres_data", "nuvira_redis_data", "nuvira_uploads", "/root/apps/nuvira",
+    "nuvira_postgres_data", "nuvira_redis_data", "nuvira_uploads",
+    "nuvira_curriculum_content", "/root/apps/nuvira",
 )
 
 REQUIRED_DISABLED_FLAGS = (
     "GOOGLE_OAUTH_ENABLED", "PAYMENTS_ENABLED", "AI_ENABLED", "EMAIL_ENABLED",
-    "FIRST_ADMIN_ENABLED", "UPLOADS_ENABLED",
+    "FIRST_ADMIN_ENABLED", "UPLOADS_ENABLED", "DEV_CURRICULUM_ENROLLMENT_ENABLED",
 )
 
 

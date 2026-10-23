@@ -25,13 +25,24 @@ from app.database import Base
 import app.models  # noqa: F401
 
 BASELINE_REVISION = "0000_authoritative_schema"
-HEAD_REVISION = "0002_security_controls"
+SECURITY_REVISION = "0002_security_controls"
+HEAD_REVISION = "0003_curriculum_library"
 SECURITY_TABLES = {
     "refresh_sessions", "oauth_states", "oauth_exchanges", "credit_packs",
     "payment_events", "account_deletion_requests",
 }
 SECURITY_UPLOAD_COLUMNS = {"error_code", "file_size", "processing_attempts"}
 SYSTEM_TABLES = {"alembic_version", "sqlite_sequence"}
+CURRICULUM_TABLES = {
+    "educational_systems", "curricula", "curriculum_versions", "learning_resources",
+    "curriculum_units", "lessons", "user_lesson_progress",
+}
+CURRICULUM_COLUMNS = {
+    "subject_packages": {"curriculum_version_id", "code", "description", "order_index", "publication_status"},
+    "chapters": {"learning_resource_id", "unit_id"},
+    "concepts": {"chapter_id", "lesson_id", "order_index"},
+    "user_subject_access": {"is_active"},
+}
 
 
 @dataclass
@@ -70,6 +81,8 @@ def _signature(
 
 def _expected_tables(profile: str) -> set[str]:
     tables = set(Base.metadata.tables)
+    if profile in {"baseline", "security"}:
+        tables -= CURRICULUM_TABLES
     if profile == "baseline":
         tables -= SECURITY_TABLES
     return tables
@@ -88,14 +101,18 @@ def _expected_columns(
     if profile == "baseline" and table_name == "uploaded_documents":
         for name in SECURITY_UPLOAD_COLUMNS:
             columns.pop(name, None)
+    if profile in {"baseline", "security"}:
+        for name in CURRICULUM_COLUMNS.get(table_name, set()):
+            columns.pop(name, None)
     if dialect_name == "sqlite" and table_name == "embeddings":
         signature = columns["embedding"]
         columns["embedding"] = ("json", *signature[1:])
     return columns
 
 
-def _expected_foreign_keys(table_name: str) -> set[tuple[tuple[str, ...], str, tuple[str, ...], str | None]]:
+def _expected_foreign_keys(table_name: str, profile: str) -> set[tuple[tuple[str, ...], str, tuple[str, ...], str | None]]:
     table = Base.metadata.tables[table_name]
+    allowed_columns = set(_expected_columns(table_name, profile, "postgresql"))
     return {
         (
             tuple(element.parent.name for element in constraint.elements),
@@ -104,6 +121,7 @@ def _expected_foreign_keys(table_name: str) -> set[tuple[tuple[str, ...], str, t
             constraint.ondelete,
         )
         for constraint in table.foreign_key_constraints
+        if all(element.parent.name in allowed_columns for element in constraint.elements)
     }
 
 
@@ -118,9 +136,11 @@ def _actual_foreign_keys(inspector, table_name: str) -> set[tuple[tuple[str, ...
 
 
 def _required_indexes(table_name: str, profile: str) -> dict[str, tuple[tuple[str, ...], bool]]:
+    allowed_columns = set(_expected_columns(table_name, profile, "postgresql"))
     result = {
         index.name: (tuple(column.name for column in index.columns), bool(index.unique))
         for index in Base.metadata.tables[table_name].indexes
+        if all(column.name in allowed_columns for column in index.columns)
     }
     if profile == "baseline" and table_name == "embeddings":
         result.pop("ix_embeddings_subject_owner_chapter_document", None)
@@ -135,12 +155,17 @@ def _actual_indexes(inspector, table_name: str) -> dict[str, tuple[tuple[str, ..
     }
 
 
-def _expected_unique_constraints(table_name: str) -> set[tuple[str, ...]]:
-    return {
+def _expected_unique_constraints(table_name: str, profile: str) -> set[tuple[str, ...]]:
+    allowed_columns = set(_expected_columns(table_name, profile, "postgresql"))
+    result = {
         tuple(column.name for column in constraint.columns)
         for constraint in Base.metadata.tables[table_name].constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
+        and all(column.name in allowed_columns for column in constraint.columns)
     }
+    if profile in {"baseline", "security"} and table_name == "user_subject_access":
+        result.discard(("user_id", "subject_package_id"))
+    return result
 
 
 def _actual_unique_constraints(inspector, table_name: str) -> set[tuple[str, ...]]:
@@ -180,7 +205,7 @@ def _compare_profile(engine: Engine, profile: str) -> list[str]:
             actual = actual_columns[column_name]
             if actual != expected:
                 errors.append(f"{table_name}.{column_name}: expected {expected}, found {actual}")
-        expected_fks = _expected_foreign_keys(table_name)
+        expected_fks = _expected_foreign_keys(table_name, profile)
         actual_fks = _actual_foreign_keys(inspector, table_name)
         if actual_fks != expected_fks:
             errors.append(f"{table_name}: foreign keys differ")
@@ -189,7 +214,7 @@ def _compare_profile(engine: Engine, profile: str) -> list[str]:
         for name, signature in expected_indexes.items():
             if actual_indexes.get(name) != signature:
                 errors.append(f"{table_name}: required index {name} differs or is missing")
-        if _actual_unique_constraints(inspector, table_name) != _expected_unique_constraints(table_name):
+        if _actual_unique_constraints(inspector, table_name) != _expected_unique_constraints(table_name, profile):
             errors.append(f"{table_name}: unique constraints differ")
     if engine.dialect.name == "postgresql":
         with engine.connect() as connection:
@@ -229,17 +254,24 @@ def assess(engine: Engine) -> Assessment:
             "legacy-compatible", stamp_target=BASELINE_REVISION,
             notes=["Schema matches the historical pre-SECURITY-01 baseline."],
         )
+    security_errors = _compare_profile(engine, "security")
+    if not security_errors and _emails_are_normalized(engine):
+        return Assessment(
+            "legacy-compatible", stamp_target=SECURITY_REVISION,
+            notes=["Schema matches SECURITY-01 head and emails are canonical."],
+        )
+    if not security_errors:
+        security_errors.append("users.email contains duplicates or non-canonical casing")
     head_errors = _compare_profile(engine, "head")
     if not head_errors and _emails_are_normalized(engine):
         return Assessment(
             "legacy-compatible", stamp_target=HEAD_REVISION,
-            notes=["Schema matches SECURITY-01 head and emails are canonical."],
+            notes=["Schema matches CURRICULUM-01 head and emails are canonical."],
         )
-    if not head_errors:
-        head_errors.append("users.email contains duplicates or non-canonical casing")
     return Assessment(
         "incompatible", errors=[
             "baseline profile: " + "; ".join(baseline_errors),
+            "security profile: " + "; ".join(security_errors),
             "head profile: " + "; ".join(head_errors),
         ],
     )

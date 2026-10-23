@@ -51,6 +51,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - curriculum_content:/app/curriculum-content
     expose:
       - "8000"
     networks: [internal, proxy]
@@ -68,6 +69,7 @@ services:
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--hostname=nuvira-worker@%h"]
     volumes:
       - uploads_data:/app/uploads
+      - curriculum_content:/app/curriculum-content
     depends_on:
       db:
         condition: service_healthy
@@ -109,6 +111,8 @@ volumes:
     name: nuvira_redis_data
   uploads_data:
     name: nuvira_uploads
+  curriculum_content:
+    name: nuvira_curriculum_content
 
 networks:
   internal:

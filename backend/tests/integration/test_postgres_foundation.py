@@ -62,7 +62,7 @@ def test_postgres_migration_pgvector_and_constraints(postgres_engine):
     assert {"users", "embeddings", "refresh_sessions", "payment_events"}.issubset(inspector.get_table_names())
     with postgres_engine.connect() as connection:
         assert connection.execute(text("SELECT extname FROM pg_extension WHERE extname='vector'")).scalar_one() == "vector"
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_security_controls"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003_curriculum_library"
     config = Config("alembic.ini")
     config.set_main_option("script_location", "alembic")
     command.upgrade(config, "head")
@@ -244,7 +244,7 @@ def test_postgres_legacy_adoption_and_incompatible_rejection(monkeypatch):
             assert connection.execute(text("SELECT email FROM users WHERE id=1")).scalar_one() == "student@example.com"
             assert connection.execute(text("SELECT title FROM chapters WHERE id=1")).scalar_one() == "Synthetic Chapter"
             assert connection.execute(text("SELECT name FROM concepts WHERE id=1")).scalar_one() == "Synthetic Concept"
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002_security_controls"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003_curriculum_library"
         engine.dispose()
 
         monkeypatch.setattr(settings, "DATABASE_URL", incompatible_url)

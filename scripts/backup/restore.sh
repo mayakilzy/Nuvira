@@ -4,7 +4,7 @@
 #  Goal: from a fresh machine to a fully running platform in minutes.
 #
 #  Usage:  ./scripts/backup/restore.sh /path/to/backup_xxx.tar.gz
-#  Steps:  start stack -> restore DB -> restore .env + uploads -> restart
+#  Steps:  start stack -> restore DB -> restore .env + private binary volumes -> restart
 # =============================================================================
 set -euo pipefail
 
@@ -54,6 +54,11 @@ if [ -d "${WORK}/uploads" ]; then
   echo "  - restoring uploads…"
   docker compose cp "${WORK}/uploads/." backend:/app/uploads/ 2>/dev/null || true
   echo "  ✓ uploads restored"
+fi
+if [ -d "${WORK}/curriculum-content" ]; then
+  echo "  - restoring curriculum sources…"
+  docker compose cp "${WORK}/curriculum-content/." backend:/app/curriculum-content/ 2>/dev/null || true
+  echo "  ✓ curriculum sources restored"
 fi
 
 rm -rf "$WORK"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  LAYER 1 — Automatic backup.
-#  Captures the three things needed to restore everything:
-#    1) PostgreSQL dump   2) .env   3) uploads volume
+#  Captures the four things needed to restore everything:
+#    1) PostgreSQL dump   2) .env   3) private uploads   4) curriculum sources
 #  Then ships the archive to up to three places: local, S3/R2, and a copy the
 #  customer keeps. Old local backups are rotated.
 #
@@ -45,6 +45,10 @@ docker compose exec -T db pg_dump --no-owner --no-acl -U "${POSTGRES_USER:-nuvir
 # 3) uploads volume (copied out of the running backend container)
 echo "  - copying uploads…"
 docker compose cp backend:/app/uploads "${WORK}/uploads" 2>/dev/null || mkdir -p "${WORK}/uploads"
+
+# 4) externally stored curriculum originals (not part of images or Git)
+echo "  - copying curriculum sources…"
+docker compose cp backend:/app/curriculum-content "${WORK}/curriculum-content" 2>/dev/null || mkdir -p "${WORK}/curriculum-content"
 
 # pack
 tar -czf "$ARCHIVE" -C "$WORK" .

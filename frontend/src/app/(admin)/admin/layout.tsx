@@ -18,6 +18,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="side">
         <div className="brand">Admin</div>
         <a href="/admin/users" className={`nav-link ${path === "/admin/users" ? "active" : ""}`}>Users</a>
+        <a href="/admin/curricula" className={`nav-link ${path === "/admin/curricula" ? "active" : ""}`}>Curricula</a>
         <a href="/dashboard" className="nav-link">← Back to app</a>
         <div style={{ marginTop: "auto" }}>
           <button className="nav-link" style={{ width: "100%", textAlign: "left", background: "none", border: 0, cursor: "pointer" }} onClick={logout}>Sign out</button>

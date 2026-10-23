@@ -26,4 +26,4 @@ docker compose exec -T backend python -c "import urllib.request; print(urllib.re
 docker compose ps
 ```
 
-Then verify login, subject access, learning history, uploaded-file availability, chat, and worker processing through the production domains. Do not delete the source backup or pre-restore volumes until business-level counts and sampled accounts pass verification.
+Then verify login, subject access, learning history, private uploaded-file availability, published curriculum source access, chat, and worker processing through the production domains. Do not delete the source backup or pre-restore volumes until business-level counts and sampled accounts pass verification.

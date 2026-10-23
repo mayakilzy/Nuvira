@@ -27,7 +27,9 @@ def test_security_migration_applies_to_existing_schema(tmp_path, monkeypatch):
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     config.set_main_option("script_location", str(Path(__file__).parents[1] / "alembic"))
     command.stamp(config, "0001_lowercase_emails")
-    command.upgrade(config, "head")
+    # This synthetic schema intentionally contains only the SECURITY-01 tables,
+    # so exercise the security revision directly rather than later feature migrations.
+    command.upgrade(config, "0002_security_controls")
     tables = set(inspect(engine).get_table_names())
     assert {"refresh_sessions", "oauth_states", "oauth_exchanges", "credit_packs",
             "payment_events", "account_deletion_requests"}.issubset(tables)

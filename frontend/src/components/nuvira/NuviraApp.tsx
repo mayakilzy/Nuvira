@@ -10,22 +10,24 @@ import {
 import { useAuth } from "@/lib/auth";
 import { apiError } from "@/lib/api";
 import {
-  Chapter, Concept, nuviraApi, Material, Preferences, Subject,
+  CatalogCurriculum, Chapter, Concept, CurriculumLesson, LessonDetail, nuviraApi,
+  Material, Preferences, Subject, SubjectStructure,
 } from "@/lib/nuvira-api";
 import { Avatar } from "./Avatar";
 
-type Tab = "garden" | "chapters" | "materials" | "settings";
+type Tab = "garden" | "catalog" | "chapters" | "materials" | "settings";
 type Language = Preferences["ui_language"];
 type Message = { id: string; from: "user" | "companion"; text: string; grounded?: boolean };
 
 const COPY = {
-  de: { garden: "Garten", chapters: "Kapitel", materials: "Materialien", settings: "Einstellungen", chat: "Mit Nuvira lernen", welcome: "Willkommen zurück", progress: "Dein Lernweg", due: "Heute zur Wiederholung", empty: "Für dein Konto ist noch kein Fach freigeschaltet.", choose: "Fach wählen", upload: "PDF oder PPT hochladen", noChapters: "Noch keine Kapitel verfügbar.", noMaterials: "Noch keine Materialien hochgeladen.", loading: "Wird geladen…", retry: "Erneut versuchen", account: "Konto", appearance: "Erscheinungsbild", language: "Sprache der Oberfläche", send: "Senden", prompt: "Frag Nuvira zu deinem Kurs…", source: "Mit deinem Kursmaterial verknüpft", understood: "Das sitzt", review: "Noch einmal ansehen" },
-  en: { garden: "Garden", chapters: "Chapters", materials: "Materials", settings: "Settings", chat: "Talk to Nuvira", welcome: "Welcome back", progress: "Your learning path", due: "Due for review", empty: "No subject has been assigned to your account yet.", choose: "Choose subject", upload: "Upload PDF or PPT", noChapters: "No chapters are available yet.", noMaterials: "No materials uploaded yet.", loading: "Loading…", retry: "Try again", account: "Account", appearance: "Appearance", language: "Interface language", send: "Send", prompt: "Ask Nuvira about your course…", source: "Linked to your course material", understood: "I understand it", review: "Review again" },
-  ar: { garden: "حديقتي", chapters: "الفصول", materials: "المواد", settings: "الإعدادات", chat: "تعلّم مع نوفيرا", welcome: "مرحبًا بعودتك", progress: "مسار تعلمك", due: "للمراجعة اليوم", empty: "لم تُضف مادة دراسية إلى حسابك بعد.", choose: "اختر المادة", upload: "ارفع PDF أو PPT", noChapters: "لا توجد فصول متاحة بعد.", noMaterials: "لم تُرفع مواد بعد.", loading: "جارٍ التحميل…", retry: "أعد المحاولة", account: "الحساب", appearance: "المظهر", language: "لغة الواجهة", send: "إرسال", prompt: "اسأل نوفيرا عن مادتك…", source: "مرتبط بمواد مقررك", understood: "فهمت الفكرة", review: "أراجعها مرة أخرى" },
+  de: { garden: "Garten", catalog: "Kurskatalog", chapters: "Lektionen", materials: "Materialien", settings: "Einstellungen", chat: "Mit Nuvira lernen", welcome: "Willkommen zurück", progress: "Dein Lernweg", due: "Heute zur Wiederholung", empty: "Du hast noch kein Fach ausgewählt.", browse: "Kurse entdecken", choose: "Fach wählen", enroll: "Testzugang aktivieren", enrolled: "Ausgewählt", openLesson: "Lektion öffnen", sourceFile: "Originalquelle ansehen", complete: "Als gelernt markieren", upload: "PDF oder PPT hochladen", noChapters: "Noch keine Lektionen verfügbar.", noMaterials: "Noch keine Materialien hochgeladen.", loading: "Wird geladen…", retry: "Erneut versuchen", account: "Konto", appearance: "Erscheinungsbild", language: "Sprache der Oberfläche", send: "Senden", prompt: "Frag Nuvira zu deinem Kurs…", source: "Mit deinem Kursmaterial verknüpft", understood: "Das sitzt", review: "Noch einmal ansehen" },
+  en: { garden: "Garden", catalog: "Curriculum catalog", chapters: "Lessons", materials: "Materials", settings: "Settings", chat: "Talk to Nuvira", welcome: "Welcome back", progress: "Your learning path", due: "Due for review", empty: "You have not selected a subject yet.", browse: "Browse curricula", choose: "Choose subject", enroll: "Activate test access", enrolled: "Enrolled", openLesson: "Open lesson", sourceFile: "View original source", complete: "Mark as learned", upload: "Upload PDF or PPT", noChapters: "No lessons are available yet.", noMaterials: "No materials uploaded yet.", loading: "Loading…", retry: "Try again", account: "Account", appearance: "Appearance", language: "Interface language", send: "Send", prompt: "Ask Nuvira about your course…", source: "Linked to your course material", understood: "I understand it", review: "Review again" },
+  ar: { garden: "حديقتي", catalog: "مكتبة المناهج", chapters: "الدروس", materials: "المواد", settings: "الإعدادات", chat: "تعلّم مع نوفيرا", welcome: "مرحبًا بعودتك", progress: "مسار تعلمك", due: "للمراجعة اليوم", empty: "لم تختر مادة دراسية بعد.", browse: "تصفّح المناهج", choose: "اختر المادة", enroll: "تفعيل وصول تجريبي", enrolled: "مسجّل", openLesson: "فتح الدرس", sourceFile: "عرض المصدر الأصلي", complete: "وضع علامة تم التعلم", upload: "ارفع PDF أو PPT", noChapters: "لا توجد دروس متاحة بعد.", noMaterials: "لم تُرفع مواد بعد.", loading: "جارٍ التحميل…", retry: "أعد المحاولة", account: "الحساب", appearance: "المظهر", language: "لغة الواجهة", send: "إرسال", prompt: "اسأل نوفيرا عن مادتك…", source: "مرتبط بمواد مقررك", understood: "فهمت الفكرة", review: "أراجعها مرة أخرى" },
 } as const;
 
 const NAV: { key: Tab; icon: typeof Home }[] = [
   { key: "garden", icon: Home },
+  { key: "catalog", icon: BookOpen },
   { key: "chapters", icon: BookOpen },
   { key: "materials", icon: Upload },
   { key: "settings", icon: Settings },
@@ -73,6 +75,8 @@ export default function NuviraApp() {
   const [theme, setTheme] = useState<Preferences["theme"]>("system");
   const [avatar, setAvatar] = useState<{ shape: "leaf"|"molecule"|"droplet"|"sprout"; color: "blue"|"purple"|"green"|"coral" }>({ shape: "molecule", color: "blue" });
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [catalog, setCatalog] = useState<CatalogCurriculum[]>([]);
+  const [developmentEnrollment, setDevelopmentEnrollment] = useState(false);
   const [subjectId, setSubjectId] = useState<number>();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [concepts, setConcepts] = useState<Concept[]>([]);
@@ -81,6 +85,8 @@ export default function NuviraApp() {
   const [due, setDue] = useState<{ id: number; name: string }[]>([]);
   const [chapterId, setChapterId] = useState<number>();
   const [concept, setConcept] = useState<Concept>();
+  const [structure, setStructure] = useState<SubjectStructure>();
+  const [lesson, setLesson] = useState<LessonDetail>();
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatText, setChatText] = useState("");
@@ -94,17 +100,18 @@ export default function NuviraApp() {
   const loadSubject = useCallback(async (id: number) => {
     try {
       setError("");
-      const [chapterData, conceptData, materialData, historyData, reviewData] = await Promise.all([
-        nuviraApi.chapters(id), nuviraApi.concepts(id), nuviraApi.materials(id), nuviraApi.history(id), nuviraApi.reviewQueue(id),
+      const [chapterData, conceptData, materialData, historyData, reviewData, structureData] = await Promise.all([
+        nuviraApi.chapters(id), nuviraApi.concepts(id), nuviraApi.materials(id), nuviraApi.history(id), nuviraApi.reviewQueue(id), nuviraApi.subjectStructure(id),
       ]);
-      setChapters(chapterData); setConcepts(conceptData.concepts); setMaterials(materialData); setHistory(historyData); setDue(reviewData);
+      setChapters(chapterData); setConcepts(conceptData.concepts); setMaterials(materialData); setHistory(historyData); setDue(reviewData); setStructure(structureData);
     } catch (reason) { setError(apiError(reason)); }
   }, []);
 
   useEffect(() => {
-    Promise.all([nuviraApi.subjects(), nuviraApi.preferences(), nuviraApi.startSession(crypto.randomUUID())])
-      .then(([subjectData, prefs, avatarData]) => {
+    Promise.all([nuviraApi.subjects(), nuviraApi.preferences(), nuviraApi.startSession(crypto.randomUUID()), nuviraApi.catalog()])
+      .then(([subjectData, prefs, avatarData, catalogData]) => {
         setSubjects(subjectData); setLanguage(prefs.ui_language); setTheme(prefs.theme); setAvatar(avatarData);
+        setCatalog(catalogData.curricula); setDevelopmentEnrollment(catalogData.development_enrollment_enabled);
         if (subjectData[0]) { setSubjectId(subjectData[0].id); void loadSubject(subjectData[0].id); }
       })
       .catch((reason) => setError(apiError(reason)))
@@ -127,9 +134,13 @@ export default function NuviraApp() {
   }, [language, rtl, theme]);
 
   const completed = useMemo(() => new Set(history.filter((item) => item.is_correct).map((item) => item.concept_id)).size, [history]);
+  const curriculumLessons = useMemo(
+    () => structure?.resources.flatMap((resource) => resource.lessons.map((item) => ({ ...item, resourceId: resource.id }))) || [],
+    [structure],
+  );
 
   async function changeSubject(id: number) {
-    setSubjectId(id); setChapterId(undefined); setConcept(undefined); setBusy(true);
+    setSubjectId(id); setChapterId(undefined); setConcept(undefined); setLesson(undefined); setBusy(true);
     await loadSubject(id); setBusy(false);
   }
 
@@ -170,6 +181,37 @@ export default function NuviraApp() {
     } catch (reason) { setError(apiError(reason)); }
   }
 
+  async function enroll(subject: { id: number }) {
+    try {
+      setError(""); await nuviraApi.enroll(subject.id);
+      const [subjectData, catalogData] = await Promise.all([nuviraApi.subjects(), nuviraApi.catalog()]);
+      setSubjects(subjectData); setCatalog(catalogData.curricula); setSubjectId(subject.id);
+      await loadSubject(subject.id); setTab("chapters");
+    } catch (reason) { setError(apiError(reason)); }
+  }
+
+  async function openLesson(item: CurriculumLesson) {
+    try { setError(""); setLesson(await nuviraApi.lesson(item.id)); }
+    catch (reason) { setError(apiError(reason)); }
+  }
+
+  async function completeLesson() {
+    if (!lesson || !subjectId) return;
+    try { await nuviraApi.saveLessonProgress(lesson.id, true); await loadSubject(subjectId); }
+    catch (reason) { setError(apiError(reason)); }
+  }
+
+  async function openSource(resourceId: number) {
+    const preview = window.open("about:blank", "_blank");
+    if (preview) preview.opener = null;
+    try {
+      const blob = await nuviraApi.source(resourceId); const url = URL.createObjectURL(blob);
+      if (preview) preview.location.href = url;
+      else { const link = document.createElement("a"); link.href = url; link.download = "curriculum-source.pdf"; link.click(); }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (reason) { preview?.close(); setError(apiError(reason)); }
+  }
+
   if (busy) return <div className="nuvira-loading"><Avatar expression="thinking" size={72}/><span>{t.loading}</span></div>;
 
   return (
@@ -183,7 +225,7 @@ export default function NuviraApp() {
 
       <main className="nuvira-main">
         {error && <div className="nuvira-error"><CircleAlert size={16}/><span>{error}</span><button onClick={() => setError("")}><X size={15}/></button></div>}
-        {!subjects.length ? <section className="empty-state"><Avatar expression="thinking" size={92}/><h1>{t.empty}</h1><p>Ask an administrator to grant access to a subject package.</p></section> : chatOpen ? (
+        {!subjects.length && tab !== "catalog" && tab !== "settings" ? <section className="empty-state"><Avatar expression="thinking" size={92}/><h1>{t.empty}</h1><p>{language === "ar" ? "يمكنك اختيار مادة منشورة بنفسك دون تدخل إداري." : language === "de" ? "Wähle selbst ein veröffentlichtes Fach aus dem Katalog." : "Choose a published subject directly from the catalog."}</p><button className="primary-action" onClick={() => setTab("catalog")}>{t.browse}</button></section> : chatOpen && subjects.length ? (
           <section className="chat-panel">
             <header><Avatar color={avatar.color} shape={avatar.shape} size={44}/><div><strong>Nuvira</strong><small>{t.chat}</small></div><button onClick={() => setChatOpen(false)}><X size={18}/></button></header>
             <div className="messages">
@@ -195,11 +237,13 @@ export default function NuviraApp() {
           </section>
         ) : (
           <>
-            <header className="page-header"><div><h1>{tab === "garden" ? `${t.welcome}${user?.full_name ? `, ${user.full_name.split(" ")[0]}` : ""}` : t[tab]}</h1><p>{subjects.find((item) => item.id === subjectId)?.name}</p></div>{subjects.length > 1 && <label><span>{t.choose}</span><select value={subjectId} onChange={(event) => void changeSubject(Number(event.target.value))}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>}</header>
+            <header className="page-header"><div><h1>{tab === "garden" ? `${t.welcome}${user?.full_name ? `, ${user.full_name.split(" ")[0]}` : ""}` : t[tab]}</h1><p>{tab === "catalog" ? (language === "ar" ? "اختر منهجًا أو عدة مواد واحتفظ بتقدمك بينها." : language === "de" ? "Wähle Lehrplan und Fächer; dein Fortschritt bleibt erhalten." : "Choose curricula and subjects; your progress remains separate.") : subjects.find((item) => item.id === subjectId)?.name}</p></div>{subjects.length > 1 && tab !== "catalog" && <label><span>{t.choose}</span><select value={subjectId} onChange={(event) => void changeSubject(Number(event.target.value))}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>}</header>
+
+            {tab === "catalog" && <section className="catalog-grid" aria-live="polite">{catalog.length ? catalog.map((curriculum) => <article className="catalog-card" key={curriculum.id}><div className="catalog-heading"><span>{curriculum.academic_level || curriculum.primary_language}</span><h2>{curriculum.title}</h2><p>{curriculum.description}</p></div>{curriculum.versions.map((version) => <div className="catalog-version" key={version.id}><small>{version.academic_year} · {version.edition}</small>{version.subjects.map((subject) => <div className="catalog-subject" key={subject.id}><div><strong>{subject.name}</strong><small>{subject.language}</small></div>{subject.enrolled ? <span className="enrolled-badge"><CheckCircle2 size={14}/>{t.enrolled}</span> : <button disabled={!developmentEnrollment} onClick={() => void enroll(subject)}>{t.enroll}</button>}</div>)}</div>)}</article>) : <div className="empty-inline"><BookOpen size={36}/><p>{language === "ar" ? "لا توجد مناهج منشورة حاليًا." : language === "de" ? "Noch keine veröffentlichten Lehrpläne." : "No published curricula are available yet."}</p></div>}</section>}
 
             {tab === "garden" && <section className="content-grid"><div className="garden-card"><div className="section-title"><div><small>{t.progress}</small><h2>{subjects.find((item) => item.id === subjectId)?.name}</h2></div><Sparkles size={21}/></div><Garden completed={completed} total={concepts.length}/><p className="gentle-note">Jeder Schritt zählt. Dein Garten wächst mit jedem Lernmoment.</p></div><div className="side-stack"><article className="summary-card"><span className="summary-icon"><BookOpen size={20}/></span><div><small>{t.chapters}</small><strong>{chapters.length}</strong></div></article><article className="summary-card"><span className="summary-icon green"><CheckCircle2 size={20}/></span><div><small>{t.progress}</small><strong>{completed} / {concepts.length}</strong></div></article><article className="review-card"><small>{t.due}</small>{due.length ? due.map((item) => <button key={item.id} onClick={() => { setTab("chapters"); setConcept(concepts.find((c) => c.id === item.id)); }}>{item.name}<ChevronRight size={15}/></button>) : <p>Heute wartet keine Wiederholung auf dich.</p>}</article></div></section>}
 
-            {tab === "chapters" && <section className="learning-layout"><div className="chapter-list"><h2>{t.chapters}</h2>{chapters.length ? chapters.map((chapter) => <button key={chapter.id} className={chapterId === chapter.id ? "selected" : ""} onClick={() => { setChapterId(chapter.id); setConcept(undefined); }}><span>{chapter.number}</span><strong>{chapter.title}</strong><ChevronRight size={16}/></button>) : <p className="muted-copy">{t.noChapters}</p>}</div><div className="concept-area">{concept ? <article className="concept-detail"><button className="back-link" onClick={() => setConcept(undefined)}><ChevronLeft size={15}/> {t.chapters}</button><div className="concept-heading"><span>0{concept.difficulty}</span><div><small>Konzept</small><h2>{concept.name}</h2></div></div>{concept.everyday_analogy && <div className="analogy"><Sparkles size={18}/><p>{concept.everyday_analogy}</p></div>}<div className="mechanism"><h3>Mechanismus</h3>{mechanismSteps(concept.mechanism).length ? mechanismSteps(concept.mechanism).map((step, index) => <div className="mechanism-step" key={index}><span>{index + 1}</span><p>{step}</p></div>) : <p className="muted-copy">Für dieses Konzept sind noch keine Mechanismus-Schritte hinterlegt.</p>}</div>{concept.official_source_note && <p className="source-note"><BookOpen size={14}/>{concept.official_source_note}</p>}<div className="attempt-actions"><button onClick={() => void record(concept.id, false)}>{t.review}</button><button className="primary" onClick={() => void record(concept.id, true)}><CheckCircle2 size={16}/>{t.understood}</button></div></article> : <><div className="concept-intro"><Avatar color={avatar.color} shape={avatar.shape} expression="calm" size={64}/><div><h2>{chapterId ? chapters.find((item) => item.id === chapterId)?.title : t.chapters}</h2><p>{chapterId ? "Die aktuelle Datenstruktur ordnet Konzepte der gesamten Fachsammlung zu." : "Wähle ein Kapitel oder beginne direkt mit einem Konzept."}</p></div></div><div className="concept-grid">{concepts.map((item) => <button key={item.id} onClick={() => setConcept(item)}><span className="difficulty">{"●".repeat(Math.min(item.difficulty, 5))}</span><strong>{item.name}</strong><p>{item.everyday_analogy || "Konzept öffnen und Mechanismus ansehen"}</p><ChevronRight size={17}/></button>)}</div></>}</div></section>}
+            {tab === "chapters" && <section className="learning-layout"><div className="chapter-list"><h2>{t.chapters}</h2>{curriculumLessons.length ? curriculumLessons.map((item) => <button key={item.id} className={lesson?.id === item.id ? "selected" : ""} onClick={() => void openLesson(item)}><span>{item.order_index}</span><strong>{item.title}</strong>{item.completed ? <CheckCircle2 size={16}/> : <ChevronRight size={16}/>}</button>) : <p className="muted-copy">{t.noChapters}</p>}</div><div className="concept-area">{lesson ? <article className="lesson-detail" dir={lesson.content_language.startsWith("ar") ? "rtl" : "ltr"}><button className="back-link" onClick={() => setLesson(undefined)}><ChevronLeft size={15}/> {t.chapters}</button><small>{lesson.page_start ? `${language === "ar" ? "الصفحة" : "Page"} ${lesson.page_start}` : ""}</small><h2>{lesson.title}</h2><div className="lesson-text">{lesson.content_text}</div>{lesson.examples.length > 0 && <section><h3>{language === "ar" ? "أمثلة" : "Examples"}</h3>{lesson.examples.map((item, index) => <p key={index}>{item}</p>)}</section>}{lesson.exercises.length > 0 && <section><h3>{language === "ar" ? "تمارين" : "Exercises"}</h3>{lesson.exercises.map((item, index) => <p key={index}>{item}</p>)}</section>}<div className="attempt-actions"><button onClick={() => void openSource(lesson.resource_id)}><BookOpen size={16}/>{t.sourceFile}</button><button className="primary" onClick={() => void completeLesson()}><CheckCircle2 size={16}/>{t.complete}</button></div></article> : concept ? <article className="concept-detail"><button className="back-link" onClick={() => setConcept(undefined)}><ChevronLeft size={15}/> {t.chapters}</button><div className="concept-heading"><span>0{concept.difficulty}</span><div><small>Concept</small><h2>{concept.name}</h2></div></div>{concept.everyday_analogy && <div className="analogy"><Sparkles size={18}/><p>{concept.everyday_analogy}</p></div>}<div className="mechanism">{mechanismSteps(concept.mechanism).map((step, index) => <div className="mechanism-step" key={index}><span>{index + 1}</span><p>{step}</p></div>)}</div><div className="attempt-actions"><button onClick={() => void record(concept.id, false)}>{t.review}</button><button className="primary" onClick={() => void record(concept.id, true)}><CheckCircle2 size={16}/>{t.understood}</button></div></article> : <><div className="concept-intro"><Avatar color={avatar.color} shape={avatar.shape} expression="calm" size={64}/><div><h2>{t.chapters}</h2><p>{language === "ar" ? "اختر درسًا لقراءة النص المستخرج ومراجعة المصدر الأصلي." : language === "de" ? "Öffne eine Lektion mit Text und Originalquelle." : "Open a lesson to read the extracted text and review its original source."}</p></div></div>{!curriculumLessons.length && <p className="muted-copy">{t.noChapters}</p>}</>}</div></section>}
 
             {tab === "materials" && <section className="materials-layout"><div><input ref={fileRef} hidden type="file" accept=".pdf,.ppt,.pptx" onChange={(event) => void uploadFile(event.target.files?.[0])}/><button className="drop-zone" onClick={() => fileRef.current?.click()}><span><Upload size={28}/></span><strong>{t.upload}</strong><small>PDF, PPT, PPTX · max. 50 MB</small></button><div className="material-list">{materials.length ? materials.map((item) => <article key={item.id}><span className="file-icon">{item.filename.toLowerCase().endsWith("pdf") ? "PDF" : "PPT"}</span><div><strong>{item.filename}</strong><small>{item.chunk_count} chunks{item.error_note ? ` · ${item.error_note}` : ""}</small></div><Status material={item}/></article>) : <p className="muted-copy">{t.noMaterials}</p>}</div></div><aside className="upload-settings"><h3>Kapitel zuweisen</h3><select value={chapterId || ""} onChange={(event) => setChapterId(event.target.value ? Number(event.target.value) : undefined)}><option value="">Allgemeines Material</option>{chapters.map((item) => <option key={item.id} value={item.id}>{item.number}. {item.title}</option>)}</select><p>Der echte Verarbeitungsstatus wird automatisch vom Worker aktualisiert.</p></aside></section>}
 

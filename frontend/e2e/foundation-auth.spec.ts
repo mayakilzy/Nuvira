@@ -54,8 +54,7 @@ test("invalid login is rejected without credentials in the URL", async ({ page }
   expect(page.url()).not.toMatch(/access_token|refresh_token/);
 });
 
-test("known limitation: zero-subject dashboard settings tab is blocked", async ({ page }) => {
-  test.fail(true, "Existing onboarding defect: the dashboard empty state masks settings content");
+test("zero-subject dashboard keeps catalog, settings and logout available", async ({ page }) => {
   const email = `zero-subject-${Date.now()}@example.com`;
   await page.goto("/register");
   await page.getByLabel("Full name").fill("Zero Subject Student");
@@ -63,6 +62,10 @@ test("known limitation: zero-subject dashboard settings tab is blocked", async (
   await page.getByLabel("Password").fill("SyntheticPass1234");
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("button", { name: /Kurse entdecken|Browse curricula|تصفّح المناهج/ })).toBeVisible();
+  await page.getByRole("button", { name: /Kurse entdecken|Browse curricula|تصفّح المناهج/ }).click();
+  await expect(page.getByRole("heading", { name: /Kurskatalog|Curriculum catalog|مكتبة المناهج/ })).toBeVisible();
   await page.getByRole("button", { name: /Einstellungen|Settings|الإعدادات/ }).first().click();
   await expect(page.getByRole("heading", { name: /Einstellungen|Settings|الإعدادات/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sign out/ })).toBeVisible();
 });

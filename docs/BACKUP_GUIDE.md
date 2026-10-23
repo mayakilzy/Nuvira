@@ -1,6 +1,6 @@
 # Nuvira Backup Guide
 
-Nuvira backups contain the PostgreSQL dump, `.env`, and uploaded materials required for recovery. The backup script writes a SHA-256 sidecar and can copy the archive to S3/R2 and an rclone destination.
+Nuvira backups contain the PostgreSQL dump, `.env`, private student uploads, and external curriculum-source volume required for recovery. The backup script writes a SHA-256 sidecar and can copy the archive to S3/R2 and an rclone destination.
 
 ## Enable scheduled backups
 

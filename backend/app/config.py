@@ -90,6 +90,17 @@ class Settings(BaseSettings):
     MAX_ARCHIVE_UNCOMPRESSED_BYTES: int = 100 * 1024 * 1024
     UPLOADS_ENABLED: bool = False
 
+    # --- Curriculum library (private binaries live outside source/images) ---
+    CONTENT_STORAGE_BACKEND: str = "local"  # local; S3-compatible adapter is a future backend
+    CONTENT_STORAGE_ROOT: str = "/app/curriculum-content"
+    CONTENT_MAX_FILE_BYTES: int = 256 * 1024 * 1024
+    CONTENT_STORAGE_QUOTA_BYTES: int = 10 * 1024 * 1024 * 1024
+    CONTENT_UPLOAD_CHUNK_BYTES: int = 1024 * 1024
+    REMOTE_IMPORT_TIMEOUT_SECONDS: float = 60.0
+    REMOTE_IMPORT_CONNECT_TIMEOUT_SECONDS: float = 10.0
+    REMOTE_IMPORT_MAX_REDIRECTS: int = 3
+    DEV_CURRICULUM_ENROLLMENT_ENABLED: bool = False
+
     @model_validator(mode="after")
     def validate_security_posture(self):
         if self.JWT_ALGORITHM != "HS256":
@@ -133,6 +144,10 @@ class Settings(BaseSettings):
                 errors.append("production must use the openai embedding provider")
             if self.EMAIL_ENABLED and not self.RESEND_API_KEY:
                 errors.append("Email is enabled but RESEND_API_KEY is missing")
+            if self.CONTENT_STORAGE_BACKEND != "local":
+                errors.append("CONTENT_STORAGE_BACKEND must be local until an object-storage adapter is configured")
+            if self.ENV == "production" and self.DEV_CURRICULUM_ENROLLMENT_ENABLED:
+                errors.append("development curriculum enrollment must be disabled in production")
             if errors:
                 raise ValueError("Unsafe managed-environment configuration: " + "; ".join(errors))
         return self

@@ -64,6 +64,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - curriculum_content:/app/curriculum-content
     ports:
       - "127.0.0.1:${STAGING_BACKEND_PORT:-8800}:8000"
     networks: [staging_internal]
@@ -93,6 +94,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - curriculum_content:/app/curriculum-content
     networks: [staging_internal]
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d foundation-worker@$$HOSTNAME --timeout=10 | grep -q pong"]
@@ -136,6 +138,8 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_redis_data
   uploads_data:
     name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_uploads_data
+  curriculum_content:
+    name: ${COMPOSE_PROJECT_NAME:-nuvira-foundation-staging}_curriculum_content
 
 networks:
   staging_internal:

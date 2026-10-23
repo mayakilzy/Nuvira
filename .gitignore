@@ -11,5 +11,8 @@ node_modules/
 *.tsbuildinfo
 test-results/
 playwright-report/
+/tmp/
+/uploads/
+/curriculum-content/
 # local source/deployment archives may contain real environments; never commit
 /*.zip

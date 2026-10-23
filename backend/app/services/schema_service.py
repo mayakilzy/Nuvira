@@ -2,7 +2,7 @@
 
 from sqlalchemy import Engine, inspect, text
 
-EXPECTED_ALEMBIC_REVISION = "0002_security_controls"
+EXPECTED_ALEMBIC_REVISION = "0003_curriculum_library"
 
 
 def require_expected_revision(engine: Engine) -> None:

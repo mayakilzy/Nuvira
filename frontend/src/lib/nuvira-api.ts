@@ -34,6 +34,26 @@ export type Preferences = {
   avatar_corner_enabled: boolean;
 };
 
+export type CatalogSubject = {
+  id: number; name: string; description?: string | null; language: string; enrolled: boolean;
+};
+export type CatalogCurriculum = {
+  id: number; title: string; description?: string | null; academic_level?: string | null;
+  grade_track?: string | null; primary_language: string;
+  versions: { id: number; academic_year: string; edition: string; subjects: CatalogSubject[] }[];
+};
+export type CurriculumLesson = {
+  id: number; title: string; description?: string | null; order_index: number;
+  page_start?: number | null; page_end?: number | null; content_language: string; completed: boolean;
+};
+export type SubjectStructure = {
+  id: number; name: string; language: string;
+  resources: { id: number; title: string; content_language: string; lessons: CurriculumLesson[] }[];
+};
+export type LessonDetail = CurriculumLesson & {
+  content_text?: string | null; examples: string[]; exercises: string[]; resource_id: number;
+};
+
 export const nuviraApi = {
   async subjects() {
     return (await api.get<{ subjects: Subject[] }>("/agent/subjects")).data.subjects;
@@ -98,5 +118,23 @@ export const nuviraApi = {
       shape: "leaf" | "molecule" | "droplet" | "sprout";
       color: "blue" | "purple" | "green" | "coral";
     };
+  },
+  async catalog() {
+    return (await api.get<{ curricula: CatalogCurriculum[]; development_enrollment_enabled: boolean }>("/curricula/catalog")).data;
+  },
+  async enroll(subjectId: number) {
+    return (await api.post(`/curricula/subjects/${subjectId}/enroll`)).data as { created: boolean };
+  },
+  async subjectStructure(subjectId: number) {
+    return (await api.get<SubjectStructure>(`/curricula/subjects/${subjectId}`)).data;
+  },
+  async lesson(lessonId: number) {
+    return (await api.get<LessonDetail>(`/curricula/lessons/${lessonId}`)).data;
+  },
+  async saveLessonProgress(lessonId: number, completed: boolean) {
+    return (await api.post(`/curricula/lessons/${lessonId}/progress`, { completed })).data;
+  },
+  async source(resourceId: number) {
+    return (await api.get(`/curricula/resources/${resourceId}/source`, { responseType: "blob" })).data as Blob;
   },
 };

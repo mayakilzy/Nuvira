@@ -17,6 +17,7 @@ from app.models.study import AvatarState, FunFactShownLog, PhraseUsage, StudyLog
 from app.models.subject import UserSubjectAccess
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.models.curriculum import UserLessonProgress
 
 
 def cleanup_account(db: Session, request_id: str) -> bool:
@@ -49,7 +50,7 @@ def cleanup_account(db: Session, request_id: str) -> bool:
         db.query(Embedding).filter(Embedding.user_id == user.id).delete(synchronize_session=False)
         for model in (
             StudyLog, FunFactShownLog, AvatarState, PhraseUsage, UserPreferences,
-            UserApiKey, UserSubjectAccess, CreditLedger, Subscription, OAuthExchange,
+            UserApiKey, UserSubjectAccess, UserLessonProgress, CreditLedger, Subscription, OAuthExchange,
             RefreshSession, UploadedDocument,
         ):
             field = model.uploaded_by_user_id if model is UploadedDocument else model.user_id

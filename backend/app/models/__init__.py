@@ -12,6 +12,10 @@ from app.models.subject import SubjectPackage, UserSubjectAccess, Concept, FunFa
 from app.models.study import StudyLog, FunFactShownLog, AvatarState, PhraseUsage
 from app.models.content import Chapter, UploadedDocument
 from app.models.preferences import UserPreferences, UserApiKey
+from app.models.curriculum import (
+    EducationalSystem, Curriculum, CurriculumVersion, LearningResource,
+    CurriculumUnit, Lesson, UserLessonProgress,
+)
 
 __all__ = [
     "User", "Subscription", "CreditLedger", "Plan", "AuditLog", "Embedding",
@@ -22,4 +26,6 @@ __all__ = [
     "StudyLog", "FunFactShownLog", "AvatarState", "PhraseUsage",
     "Chapter", "UploadedDocument",
     "UserPreferences", "UserApiKey",
+    "EducationalSystem", "Curriculum", "CurriculumVersion", "LearningResource",
+    "CurriculumUnit", "Lesson", "UserLessonProgress",
 ]

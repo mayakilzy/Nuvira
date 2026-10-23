@@ -14,6 +14,8 @@ class Chapter(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     subject_package_id: Mapped[int] = mapped_column(ForeignKey("subject_packages.id"), index=True, nullable=False)
+    learning_resource_id: Mapped[int | None] = mapped_column(ForeignKey("learning_resources.id"), index=True)
+    unit_id: Mapped[int | None] = mapped_column(ForeignKey("curriculum_units.id"), index=True)
     chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

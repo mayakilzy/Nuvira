@@ -14,7 +14,7 @@ from app.config import settings
 from app.database import engine, Base
 from app.services.schema_service import require_expected_revision
 import app.models  # noqa: F401  (register all models on Base.metadata)
-from app.routers import auth, billing, credits, user, admin, agent
+from app.routers import auth, billing, credits, user, admin, agent, curricula
 
 
 @asynccontextmanager
@@ -67,7 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth.router, billing.router, credits.router, user.router, admin.router, agent.router):
+for r in (auth.router, billing.router, credits.router, user.router, admin.router, agent.router, curricula.router):
     app.include_router(r, prefix=settings.API_PREFIX)
 
 

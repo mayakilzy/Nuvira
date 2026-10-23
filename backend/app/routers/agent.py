@@ -22,6 +22,7 @@ from app.models.subject import Concept, SubjectPackage, UserSubjectAccess
 from app.models.content import Chapter, UploadedDocument
 from app.models.preferences import UserPreferences
 from app.models.study import StudyLog
+from app.models.curriculum import Lesson
 from app.services import ai_service, companion_service, embedding_service, vector_service
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -126,6 +127,8 @@ def _require_subject_access(db: Session, user: User, subject_package_id: int) ->
     if not subject:
         raise HTTPException(404, "Subject not found")
     if user.role != "admin":
+        if subject.publication_status not in {"published", None}:
+            raise HTTPException(404, "Published subject not found")
         grant = (
             db.query(UserSubjectAccess)
             .filter(
@@ -154,8 +157,12 @@ def list_subjects(user: User = Depends(get_current_user), db: Session = Depends(
         query = query.join(
             UserSubjectAccess,
             UserSubjectAccess.subject_package_id == SubjectPackage.id,
-        ).filter(UserSubjectAccess.user_id == user.id)
-    subjects = query.order_by(SubjectPackage.name).all()
+        ).filter(
+            UserSubjectAccess.user_id == user.id,
+            UserSubjectAccess.is_active.is_(True),
+            SubjectPackage.publication_status == "published",
+        )
+    subjects = query.order_by(SubjectPackage.order_index, SubjectPackage.name).all()
     return {
         "subjects": [
             {
@@ -180,8 +187,6 @@ class ChatIn(BaseModel):
 @router.post("/chat")
 async def chat(data: ChatIn, user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
-    if not settings.AI_ENABLED:
-        raise HTTPException(503, "AI companion is disabled")
     name = user.full_name or "there"
 
     subject_name, university, teaching_language = "General Studies", None, "de"
@@ -195,6 +200,25 @@ async def chat(data: ChatIn, user: User = Depends(get_current_user),
         chapter = db.query(Chapter).filter(Chapter.id == data.chapter_id).first()
         if not chapter or chapter.subject_package_id != data.subject_package_id:
             raise HTTPException(400, "Chapter does not belong to the selected subject")
+
+    if not settings.AI_ENABLED:
+        if not data.subject_package_id:
+            raise HTTPException(503, "AI companion is disabled; choose a lesson to use stored content")
+        lesson_query = db.query(Lesson).filter(
+            Lesson.subject_package_id == data.subject_package_id,
+            Lesson.publication_status == "published",
+        )
+        if data.chapter_id:
+            lesson_query = lesson_query.filter(Lesson.chapter_id == data.chapter_id)
+        lessons = lesson_query.order_by(Lesson.order_index).limit(3).all()
+        excerpt = "\n\n".join((lesson.content_text or "")[:1200] for lesson in lessons if lesson.content_text)
+        if not excerpt:
+            raise HTTPException(503, "AI companion is disabled and no reviewed lesson text is available")
+        return {
+            "reply": excerpt,
+            "used_material_context": True,
+            "mode": "stored-content",
+        }
 
     retrieved_context = None
     if data.subject_package_id:
@@ -329,7 +353,7 @@ def fun_fact(concept_id: int, minute: int, user: User = Depends(get_current_user
 @router.get("/review-queue")
 def review_queue(subject_package_id: int, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)):
-    _require_subject_access(db, user, subject_package_id)
+    subject = _require_subject_access(db, user, subject_package_id)
     due = companion_service.concepts_due_for_review(db, user.id, subject_package_id)
     return {"due_concepts": [{"id": c.id, "name": c.name} for c in due]}
 
@@ -355,22 +379,19 @@ def list_concepts(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _require_subject_access(db, user, subject_package_id)
+    subject = _require_subject_access(db, user, subject_package_id)
     if chapter_id is not None:
         chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
         if not chapter or chapter.subject_package_id != subject_package_id:
             raise HTTPException(404, "Chapter not found in this subject")
 
-    # Concepts predate chapter associations in the current schema. Return the
-    # authorized subject's concepts and expose this limitation explicitly.
-    concepts = (
-        db.query(Concept)
-        .filter(Concept.subject_package_id == subject_package_id)
-        .order_by(Concept.name)
-        .all()
-    )
+    query = db.query(Concept).filter(Concept.subject_package_id == subject_package_id)
+    chapter_filter_applied = chapter_id is not None and subject.curriculum_version_id is not None
+    if chapter_filter_applied:
+        query = query.filter(Concept.chapter_id == chapter_id)
+    concepts = query.order_by(Concept.order_index, Concept.name).all()
     return {
-        "chapter_filter_applied": False,
+        "chapter_filter_applied": chapter_filter_applied,
         "concepts": [
             {
                 "id": concept.id,

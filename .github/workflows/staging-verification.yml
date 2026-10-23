@@ -74,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           sed -i "s/UPLOADS_ENABLED=false/UPLOADS_ENABLED=true/" .env.staging
+          sed -i "s/DEV_CURRICULUM_ENROLLMENT_ENABLED=false/DEV_CURRICULUM_ENROLLMENT_ENABLED=true/" .env.staging
           sed -i "s/EMBEDDING_PROVIDER=openai/EMBEDDING_PROVIDER=deterministic-test/" .env.staging
           sed -i "s/MAX_UPLOAD_BYTES=52428800/MAX_UPLOAD_BYTES=1048576/" .env.staging
 
@@ -122,7 +123,7 @@ jobs:
           sort -u -o .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-networks.txt
           cat .staging-artifacts/runtime-networks.txt
           docker volume ls --filter label=com.docker.compose.project=nuvira-foundation-staging --format '{{.Name}}' | sort | tee .staging-artifacts/runtime-volumes.txt
-          ! grep -Eiq '(^|[_-])nuvira_(postgres_data|redis_data|uploads)($|[_-])|hermes-network' .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-volumes.txt
+          ! grep -Eiq '(^|[_-])nuvira_(postgres_data|redis_data|uploads|curriculum_content)($|[_-])|hermes-network' .staging-artifacts/runtime-networks.txt .staging-artifacts/runtime-volumes.txt
 
       - name: Prepare the isolated backend test runner
         shell: bash
@@ -178,6 +179,9 @@ jobs:
           docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
             -e STAGING_API_URL=http://backend:8000 \
             backend python -m pytest -q tests/integration/test_staging_http_documents.py | tee .staging-artifacts/document-tests.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
+            -e STAGING_API_URL=http://backend:8000 \
+            backend python -m pytest -q tests/integration/test_staging_http_curriculum.py | tee .staging-artifacts/curriculum-tests.txt
 
       - name: Verify broker outage recovery
         shell: bash
@@ -245,6 +249,14 @@ jobs:
             sh -c 'tar -xzf - -C /restore' < .staging-private/uploads.tar.gz
           docker run --rm --network none -v nuvira-foundation-staging_uploads_restore_data:/restore alpine:3.21 \
             sh -c 'find /restore -type f | wc -l' | tee .staging-artifacts/restored-upload-count.txt
+          docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T backend \
+            tar -czf - -C /app/curriculum-content . > .staging-private/curriculum-content.tar.gz
+          sha256sum .staging-private/curriculum-content.tar.gz | sed 's#.staging-private/##' | tee .staging-artifacts/curriculum-content-backup.sha256
+          docker volume create --label com.nuvira.environment=staging nuvira-foundation-staging_curriculum_restore_data >/dev/null
+          docker run --rm --network none -i -v nuvira-foundation-staging_curriculum_restore_data:/restore alpine:3.21 \
+            sh -c 'tar -xzf - -C /restore' < .staging-private/curriculum-content.tar.gz
+          docker run --rm --network none -v nuvira-foundation-staging_curriculum_restore_data:/restore alpine:3.21 \
+            sh -c 'find /restore -type f | wc -l' | tee .staging-artifacts/restored-curriculum-source-count.txt
           curl -fsS http://127.0.0.1:8800/health/db | tee .staging-artifacts/post-restore-original-health.json
 
       - name: Collect failure diagnostics
