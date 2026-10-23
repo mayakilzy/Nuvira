@@ -166,6 +166,7 @@ jobs:
             -e EXTRA_CORS_ORIGINS= \
             -e EMBEDDING_PROVIDER=openai \
             -e UPLOADS_ENABLED=false \
+            -e DEV_CURRICULUM_ENROLLMENT_ENABLED=false \
             backend \
             python -m pytest -q --ignore=tests/test_staging_isolation.py | tee .staging-artifacts/backend-tests.txt
           docker compose --env-file .env.staging -f docker-compose.staging.yml exec -T \
